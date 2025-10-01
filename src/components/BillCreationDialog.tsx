@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Trash2, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface BillCreationDialogProps {
   open: boolean;
@@ -15,10 +17,11 @@ interface BillCreationDialogProps {
 }
 
 const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => {
-  const { customers, addBill, addOrnaments, getCustomerBills } = useData();
+  const { customers, addBill, addOrnaments, transactions } = useData();
   const [selectedCustomer, setSelectedCustomer] = useState('');
-  const [customerHistory, setCustomerHistory] = useState<any[]>([]);
+  const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [openCombobox, setOpenCombobox] = useState(false);
   const [billData, setBillData] = useState({
     billId: '',
     amount: '',
@@ -30,11 +33,14 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
 
   useEffect(() => {
     if (selectedCustomer) {
-      const history = getCustomerBills(selectedCustomer);
-      setCustomerHistory(history);
-      setShowHistory(history.length > 0);
+      const customerTxns = transactions.filter(t => t.customerId === selectedCustomer);
+      setCustomerTransactions(customerTxns);
+      setShowHistory(customerTxns.length > 0);
+    } else {
+      setCustomerTransactions([]);
+      setShowHistory(false);
     }
-  }, [selectedCustomer]);
+  }, [selectedCustomer, transactions]);
 
   const addOrnamentRow = () => {
     setOrnaments([...ornaments, { name: '', grossWeight: '', netWeight: '', interest: '', image: '' }]);
@@ -90,6 +96,7 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
     setBillData({ billId: '', amount: '', interestRate: '' });
     setOrnaments([{ name: '', grossWeight: '', netWeight: '', interest: '', image: '' }]);
     setSelectedCustomer('');
+    setCustomerTransactions([]);
     setShowHistory(false);
     onOpenChange(false);
   };
@@ -105,18 +112,49 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Customer</Label>
-              <Select value={selectedCustomer} onValueChange={setSelectedCustomer} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} - {c.village}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openCombobox}
+                    className="w-full justify-between"
+                  >
+                    {selectedCustomer
+                      ? customers.find((c) => c.id === selectedCustomer)?.name + ' - ' + customers.find((c) => c.id === selectedCustomer)?.village
+                      : "Select customer..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search customer..." />
+                    <CommandList>
+                      <CommandEmpty>No customer found.</CommandEmpty>
+                      <CommandGroup>
+                        {customers.map((customer) => (
+                          <CommandItem
+                            key={customer.id}
+                            value={`${customer.name} ${customer.village}`}
+                            onSelect={() => {
+                              setSelectedCustomer(customer.id);
+                              setOpenCombobox(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedCustomer === customer.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {customer.name} - {customer.village}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
@@ -156,17 +194,22 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
             </div>
           </div>
 
-          {showHistory && customerHistory.length > 0 && (
+          {showHistory && customerTransactions.length > 0 && (
             <Card className="bg-muted/50">
               <CardHeader>
                 <CardTitle className="text-sm">Customer Transaction History</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {customerHistory.map(bill => (
-                  <div key={bill.id} className="flex justify-between text-sm p-2 bg-background rounded">
-                    <span>Bill #{bill.billId}</span>
-                    <span className="text-muted-foreground">₹{bill.amount.toLocaleString()}</span>
-                    <span className="text-xs text-muted-foreground">{new Date(bill.createdAt).toLocaleDateString()}</span>
+              <CardContent className="space-y-2 max-h-48 overflow-y-auto">
+                {customerTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(txn => (
+                  <div key={txn.id} className="flex justify-between items-center text-sm p-2 bg-background rounded">
+                    <div className="flex-1">
+                      <span className="font-medium">{txn.type.replace(/_/g, ' ').toUpperCase()}</span>
+                      <p className="text-xs text-muted-foreground">{txn.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-semibold text-primary">₹{txn.amount.toLocaleString()}</span>
+                      <p className="text-xs text-muted-foreground">{new Date(txn.date).toLocaleDateString()}</p>
+                    </div>
                   </div>
                 ))}
               </CardContent>
