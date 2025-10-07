@@ -64,6 +64,7 @@ interface DataContextType {
   getCustomerBills: (customerId: string) => Bill[];
   getBillOrnaments: (billId: string) => Ornament[];
   getTodayTransactions: () => Transaction[];
+  getTransactionsByDateRange: (startDate: Date, endDate: Date) => Transaction[];
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -175,6 +176,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     return transactions.filter(t => new Date(t.date).toDateString() === today);
   };
 
+  const getTransactionsByDateRange = (startDate: Date, endDate: Date) => {
+    return transactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      return transactionDate >= startDate && transactionDate <= endDate;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -192,6 +200,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         getCustomerBills,
         getBillOrnaments,
         getTodayTransactions,
+        getTransactionsByDateRange,
       }}
     >
       {children}
