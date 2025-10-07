@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -28,7 +29,7 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
     interestRate: '',
   });
   const [ornaments, setOrnaments] = useState<any[]>([
-    { name: '', grossWeight: '', netWeight: '', interest: '', image: '' }
+    { name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }
   ]);
 
   useEffect(() => {
@@ -43,7 +44,7 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
   }, [selectedCustomer, transactions]);
 
   const addOrnamentRow = () => {
-    setOrnaments([...ornaments, { name: '', grossWeight: '', netWeight: '', interest: '', image: '' }]);
+    setOrnaments([...ornaments, { name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }]);
   };
 
   const removeOrnamentRow = (index: number) => {
@@ -85,6 +86,7 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
     addOrnaments(ornaments.map(o => ({
       billId: billData.billId,
       name: o.name,
+      type: o.type as 'gold' | 'silver',
       grossWeight: parseFloat(o.grossWeight),
       netWeight: parseFloat(o.netWeight),
       interest: parseFloat(o.interest),
@@ -94,7 +96,7 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
     toast.success('Bill created successfully!');
     
     setBillData({ billId: '', amount: '', interestRate: '' });
-    setOrnaments([{ name: '', grossWeight: '', netWeight: '', interest: '', image: '' }]);
+    setOrnaments([{ name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }]);
     setSelectedCustomer('');
     setCustomerTransactions([]);
     setShowHistory(false);
@@ -237,6 +239,18 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
                         placeholder="e.g., Gold Chain"
                         required
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Metal Type</Label>
+                      <Select value={ornament.type} onValueChange={(value) => updateOrnament(index, 'type', value)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gold">Gold</SelectItem>
+                          <SelectItem value="silver">Silver</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Gross Weight (g)</Label>

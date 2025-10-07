@@ -3,21 +3,28 @@ import { useData, Customer } from '@/context/DataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, Phone, MapPin, User } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Plus, Search, Phone, MapPin, User, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import CustomerDetailsDialog from '@/components/CustomerDetailsDialog';
 
 const Customers = () => {
   const { customers, addCustomer } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     village: '',
     phoneNumber: '',
     fatherHusbandName: '',
     fatherHusbandVillage: '',
+    image: '',
+    description: '',
   });
 
   const filteredCustomers = customers.filter(
@@ -26,6 +33,17 @@ const Customers = () => {
       c.phoneNumber.includes(searchTerm) ||
       c.village.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, image: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,8 +55,15 @@ const Customers = () => {
       phoneNumber: '',
       fatherHusbandName: '',
       fatherHusbandVillage: '',
+      image: '',
+      description: '',
     });
     setIsDialogOpen(false);
+  };
+
+  const handleCustomerClick = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsDetailsOpen(true);
   };
 
   return (
@@ -60,50 +85,84 @@ const Customers = () => {
               <DialogTitle>Add New Customer</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Customer Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
+                  <Label htmlFor="image">Customer Image</Label>
+                  <div className="flex items-center gap-4">
+                    {formData.image && (
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={formData.image} />
+                        <AvatarFallback>{formData.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div className="flex-1">
+                      <Input
+                        id="image"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="cursor-pointer"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Customer Name</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="village">Village</Label>
+                    <Input
+                      id="village"
+                      value={formData.village}
+                      onChange={(e) => setFormData({ ...formData, village: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Phone Number</Label>
+                    <Input
+                      id="phoneNumber"
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fatherHusbandName">Father/Husband Name</Label>
+                    <Input
+                      id="fatherHusbandName"
+                      value={formData.fatherHusbandName}
+                      onChange={(e) => setFormData({ ...formData, fatherHusbandName: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="fatherHusbandVillage">Father/Husband Village</Label>
+                    <Input
+                      id="fatherHusbandVillage"
+                      value={formData.fatherHusbandVillage}
+                      onChange={(e) => setFormData({ ...formData, fatherHusbandVillage: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="village">Village</Label>
-                  <Input
-                    id="village"
-                    value={formData.village}
-                    onChange={(e) => setFormData({ ...formData, village: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Phone Number</Label>
-                  <Input
-                    id="phoneNumber"
-                    value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fatherHusbandName">Father/Husband Name</Label>
-                  <Input
-                    id="fatherHusbandName"
-                    value={formData.fatherHusbandName}
-                    onChange={(e) => setFormData({ ...formData, fatherHusbandName: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="fatherHusbandVillage">Father/Husband Village</Label>
-                  <Input
-                    id="fatherHusbandVillage"
-                    value={formData.fatherHusbandVillage}
-                    onChange={(e) => setFormData({ ...formData, fatherHusbandVillage: e.target.value })}
-                    required
+                  <Label htmlFor="description">Description (Optional)</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Add any additional notes about the customer..."
+                    rows={3}
                   />
                 </div>
               </div>
@@ -127,18 +186,26 @@ const Customers = () => {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredCustomers.map((customer) => (
-          <Card key={customer.id} className="hover:shadow-[var(--shadow-gold)] transition-shadow">
+          <Card 
+            key={customer.id} 
+            className="hover:shadow-[var(--shadow-gold)] transition-shadow cursor-pointer"
+            onClick={() => handleCustomerClick(customer)}
+          >
             <CardContent className="p-6">
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={customer.image} alt={customer.name} />
+                    <AvatarFallback>{customer.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
                     <h3 className="font-semibold text-lg">{customer.name}</h3>
                     <p className="text-sm text-muted-foreground">S/O {customer.fatherHusbandName}</p>
                   </div>
                 </div>
+                {customer.description && (
+                  <p className="text-sm text-muted-foreground line-clamp-2">{customer.description}</p>
+                )}
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Phone className="h-4 w-4" />
@@ -158,6 +225,12 @@ const Customers = () => {
           </Card>
         ))}
       </div>
+
+      <CustomerDetailsDialog
+        customer={selectedCustomer}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
 
       {filteredCustomers.length === 0 && (
         <div className="text-center py-12">

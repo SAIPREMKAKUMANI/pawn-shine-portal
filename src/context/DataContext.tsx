@@ -7,6 +7,8 @@ export interface Customer {
   phoneNumber: string;
   fatherHusbandName: string;
   fatherHusbandVillage: string;
+  image?: string;
+  description?: string;
   createdAt: string;
 }
 
@@ -14,6 +16,7 @@ export interface Ornament {
   id: string;
   billId: string;
   name: string;
+  type: 'gold' | 'silver';
   grossWeight: number;
   netWeight: number;
   interest: number;
