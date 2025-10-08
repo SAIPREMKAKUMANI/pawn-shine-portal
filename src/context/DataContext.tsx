@@ -33,9 +33,19 @@ export interface Bill {
   status: 'active' | 'released' | 'cleared';
   createdAt: string;
   releasedAt?: string;
+  clearedAt?: string;
   releaseImage?: string;
   totalInterestPaid: number;
   extraAmountPaid: number;
+  releaseAccountId?: string;
+}
+
+export interface Account {
+  id: string;
+  name: string;
+  type: 'cash' | 'bank';
+  balance: number;
+  createdAt: string;
 }
 
 export interface Transaction {
@@ -47,6 +57,7 @@ export interface Transaction {
   amount: number;
   description: string;
   date: string;
+  accountId?: string;
 }
 
 interface DataContextType {
@@ -54,6 +65,7 @@ interface DataContextType {
   bills: Bill[];
   ornaments: Ornament[];
   transactions: Transaction[];
+  accounts: Account[];
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => void;
   updateCustomer: (id: string, customer: Partial<Customer>) => void;
   addBill: (bill: Omit<Bill, 'id' | 'createdAt' | 'totalInterestPaid' | 'extraAmountPaid'>) => string;
@@ -61,10 +73,13 @@ interface DataContextType {
   addOrnaments: (ornaments: Omit<Ornament, 'id'>[]) => void;
   updateOrnament: (id: string, ornament: Partial<Ornament>) => void;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'date'>) => void;
+  addAccount: (account: Omit<Account, 'id' | 'createdAt' | 'balance'>) => void;
+  updateAccount: (id: string, account: Partial<Account>) => void;
   getCustomerBills: (customerId: string) => Bill[];
   getBillOrnaments: (billId: string) => Ornament[];
   getTodayTransactions: () => Transaction[];
   getTransactionsByDateRange: (startDate: Date, endDate: Date) => Transaction[];
+  getAccountTransactions: (accountId: string) => Transaction[];
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -74,17 +89,20 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [ornaments, setOrnaments] = useState<Ornament[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
 
   useEffect(() => {
     const savedCustomers = localStorage.getItem('pawn_customers');
     const savedBills = localStorage.getItem('pawn_bills');
     const savedOrnaments = localStorage.getItem('pawn_ornaments');
     const savedTransactions = localStorage.getItem('pawn_transactions');
+    const savedAccounts = localStorage.getItem('pawn_accounts');
 
     if (savedCustomers) setCustomers(JSON.parse(savedCustomers));
     if (savedBills) setBills(JSON.parse(savedBills));
     if (savedOrnaments) setOrnaments(JSON.parse(savedOrnaments));
     if (savedTransactions) setTransactions(JSON.parse(savedTransactions));
+    if (savedAccounts) setAccounts(JSON.parse(savedAccounts));
   }, []);
 
   useEffect(() => {
@@ -102,6 +120,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('pawn_transactions', JSON.stringify(transactions));
   }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem('pawn_accounts', JSON.stringify(accounts));
+  }, [accounts]);
 
   const addCustomer = (customer: Omit<Customer, 'id' | 'createdAt'>) => {
     const newCustomer: Customer = {
@@ -183,6 +205,24 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   };
 
+  const addAccount = (account: Omit<Account, 'id' | 'createdAt' | 'balance'>) => {
+    const newAccount: Account = {
+      ...account,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      balance: 0,
+    };
+    setAccounts([...accounts, newAccount]);
+  };
+
+  const updateAccount = (id: string, account: Partial<Account>) => {
+    setAccounts(accounts.map(a => a.id === id ? { ...a, ...account } : a));
+  };
+
+  const getAccountTransactions = (accountId: string) => {
+    return transactions.filter(t => t.accountId === accountId);
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -190,6 +230,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         bills,
         ornaments,
         transactions,
+        accounts,
         addCustomer,
         updateCustomer,
         addBill,
@@ -197,10 +238,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         addOrnaments,
         updateOrnament,
         addTransaction,
+        addAccount,
+        updateAccount,
         getCustomerBills,
         getBillOrnaments,
         getTodayTransactions,
         getTransactionsByDateRange,
+        getAccountTransactions,
       }}
     >
       {children}

@@ -60,6 +60,9 @@ const DayBook = () => {
   const getBillDate = (billId: string) => {
     const bill = bills.find(b => b.billId === billId);
     if (!bill) return '';
+    if (bill.status === 'cleared' && bill.clearedAt) {
+      return `Cleared: ${new Date(bill.clearedAt).toLocaleDateString()}`;
+    }
     if (bill.status === 'released' && bill.releasedAt) {
       return `Released: ${new Date(bill.releasedAt).toLocaleDateString()}`;
     }

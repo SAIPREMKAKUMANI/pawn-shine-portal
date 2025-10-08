@@ -108,7 +108,7 @@ const Customers = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative">
                     <Label htmlFor="name">Customer Name</Label>
                     <Input
                       id="name"
@@ -116,6 +116,32 @@ const Customers = () => {
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                     />
+                    {formData.name && filteredCustomers.length > 0 && (
+                      <Card className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto">
+                        <CardContent className="p-2">
+                          {filteredCustomers.slice(0, 5).map((customer) => (
+                            <div
+                              key={customer.id}
+                              className="p-2 hover:bg-muted rounded cursor-pointer text-sm"
+                              onClick={() => {
+                                setFormData({
+                                  name: customer.name,
+                                  village: customer.village,
+                                  phoneNumber: customer.phoneNumber,
+                                  fatherHusbandName: customer.fatherHusbandName,
+                                  fatherHusbandVillage: customer.fatherHusbandVillage,
+                                  image: customer.image || '',
+                                  description: customer.description || '',
+                                });
+                              }}
+                            >
+                              <div className="font-medium">{customer.name}</div>
+                              <div className="text-muted-foreground">{customer.phoneNumber} - {customer.village}</div>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="village">Village</Label>

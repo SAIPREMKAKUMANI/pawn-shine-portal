@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Sparkles, LayoutDashboard, Users, FileText, BookOpen, LogOut } from 'lucide-react';
+import { Sparkles, LayoutDashboard, Users, FileText, BookOpen, Wallet, LogOut } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,6 +18,7 @@ const Layout = ({ children }: LayoutProps) => {
     { path: '/customers', label: 'Customers', icon: Users },
     { path: '/bills', label: 'Bills', icon: FileText },
     { path: '/daybook', label: 'Day Book', icon: BookOpen },
+    { path: '/accounts', label: 'Accounts', icon: Wallet },
   ];
 
   const handleLogout = () => {

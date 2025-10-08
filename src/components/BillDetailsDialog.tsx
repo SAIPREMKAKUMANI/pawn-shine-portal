@@ -16,7 +16,7 @@ interface BillDetailsDialogProps {
 }
 
 const BillDetailsDialog = ({ billId, open, onOpenChange }: BillDetailsDialogProps) => {
-  const { bills, updateBill, getBillOrnaments, addTransaction, customers } = useData();
+  const { bills, updateBill, getBillOrnaments, addTransaction, customers, accounts, addAccount, updateAccount } = useData();
   const bill = bills.find(b => b.id === billId);
   const ornaments = getBillOrnaments(bill?.billId || '');
   
@@ -24,6 +24,10 @@ const BillDetailsDialog = ({ billId, open, onOpenChange }: BillDetailsDialogProp
   const [extraAmount, setExtraAmount] = useState('');
   const [releaseImage, setReleaseImage] = useState('');
   const [transferCustomerId, setTransferCustomerId] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [newAccountName, setNewAccountName] = useState('');
+  const [newAccountType, setNewAccountType] = useState<'cash' | 'bank'>('cash');
+  const [showNewAccountForm, setShowNewAccountForm] = useState(false);
 
   if (!bill) return null;
 
@@ -65,12 +69,28 @@ const BillDetailsDialog = ({ billId, open, onOpenChange }: BillDetailsDialogProp
     }
   };
 
+  const handleCreateAccount = () => {
+    if (newAccountName) {
+      addAccount({ name: newAccountName, type: newAccountType });
+      toast.success('Account created successfully');
+      setNewAccountName('');
+      setShowNewAccountForm(false);
+    }
+  };
+
   const handleRelease = () => {
+    if (!selectedAccountId) {
+      toast.error('Please select an account');
+      return;
+    }
+
     updateBill(bill.id, {
       status: 'released',
       releasedAt: new Date().toISOString(),
       releaseImage,
+      releaseAccountId: selectedAccountId,
     });
+
     addTransaction({
       billId: bill.billId,
       customerId: bill.customerId,
@@ -78,7 +98,17 @@ const BillDetailsDialog = ({ billId, open, onOpenChange }: BillDetailsDialogProp
       type: 'bill_released',
       amount: bill.amount,
       description: `Bill #${bill.billId} released`,
+      accountId: selectedAccountId,
     });
+
+    // Update account balance
+    const account = accounts.find(a => a.id === selectedAccountId);
+    if (account) {
+      updateAccount(selectedAccountId, {
+        balance: account.balance + bill.amount,
+      });
+    }
+
     toast.success('Bill released successfully');
     onOpenChange(false);
   };
@@ -86,6 +116,7 @@ const BillDetailsDialog = ({ billId, open, onOpenChange }: BillDetailsDialogProp
   const handleClear = () => {
     updateBill(bill.id, {
       status: 'cleared',
+      clearedAt: new Date().toISOString(),
     });
     addTransaction({
       billId: bill.billId,
@@ -236,7 +267,68 @@ const BillDetailsDialog = ({ billId, open, onOpenChange }: BillDetailsDialogProp
                             }
                           }}
                         />
-                        <Button onClick={handleRelease} className="w-full" disabled={!releaseImage}>
+                        
+                        <div className="space-y-2">
+                          <Label>Select Account</Label>
+                          <select 
+                            className="w-full p-2 border rounded-md"
+                            value={selectedAccountId}
+                            onChange={(e) => setSelectedAccountId(e.target.value)}
+                          >
+                            <option value="">Select an account</option>
+                            {accounts.map(account => (
+                              <option key={account.id} value={account.id}>
+                                {account.name} ({account.type}) - ₹{account.balance.toLocaleString()}
+                              </option>
+                            ))}
+                          </select>
+                          
+                          {!showNewAccountForm ? (
+                            <Button 
+                              variant="outline" 
+                              className="w-full"
+                              onClick={() => setShowNewAccountForm(true)}
+                            >
+                              + Create New Account
+                            </Button>
+                          ) : (
+                            <div className="space-y-2 border p-3 rounded">
+                              <Input
+                                placeholder="Account Name"
+                                value={newAccountName}
+                                onChange={(e) => setNewAccountName(e.target.value)}
+                              />
+                              <select
+                                className="w-full p-2 border rounded-md"
+                                value={newAccountType}
+                                onChange={(e) => setNewAccountType(e.target.value as 'cash' | 'bank')}
+                              >
+                                <option value="cash">Cash</option>
+                                <option value="bank">Bank</option>
+                              </select>
+                              <div className="flex gap-2">
+                                <Button onClick={handleCreateAccount} className="flex-1">
+                                  Create
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => {
+                                    setShowNewAccountForm(false);
+                                    setNewAccountName('');
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <Button 
+                          onClick={handleRelease} 
+                          className="w-full" 
+                          disabled={!releaseImage || !selectedAccountId}
+                        >
                           Release Ornament
                         </Button>
                       </div>

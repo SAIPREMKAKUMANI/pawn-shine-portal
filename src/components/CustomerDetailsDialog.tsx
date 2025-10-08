@@ -25,6 +25,10 @@ const CustomerDetailsDialog = ({ customer, open, onOpenChange }: CustomerDetails
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [ornamentTypeFilter, setOrnamentTypeFilter] = useState<string>('all');
   const [metalTypeFilter, setMetalTypeFilter] = useState<string>('all');
+  const [billIdFilter, setBillIdFilter] = useState<string>('all');
+  const [billTypeFilter, setBillTypeFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'amount' | 'date'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const customerTransactions = useMemo(() => {
     if (!customer) return [];
@@ -35,8 +39,29 @@ const CustomerDetailsDialog = ({ customer, open, onOpenChange }: CustomerDetails
 
   const customerBills = useMemo(() => {
     if (!customer) return [];
-    return bills.filter(b => b.customerId === customer.id);
-  }, [customer, bills]);
+    let filtered = bills.filter(b => b.customerId === customer.id);
+    
+    if (billIdFilter !== 'all') {
+      filtered = filtered.filter(b => b.billId === billIdFilter);
+    }
+    
+    if (billTypeFilter !== 'all') {
+      filtered = filtered.filter(b => b.status === billTypeFilter);
+    }
+    
+    // Sort bills
+    filtered.sort((a, b) => {
+      if (sortBy === 'amount') {
+        return sortOrder === 'asc' ? a.amount - b.amount : b.amount - a.amount;
+      } else {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+    });
+    
+    return filtered;
+  }, [customer, bills, billIdFilter, billTypeFilter, sortBy, sortOrder]);
 
   const customerOrnaments = useMemo(() => {
     if (!customer) return [];
@@ -183,12 +208,99 @@ const CustomerDetailsDialog = ({ customer, open, onOpenChange }: CustomerDetails
             </CardContent>
           </Card>
 
-          <Tabs defaultValue="transactions" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs defaultValue="bills" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="bills">Bills</TabsTrigger>
               <TabsTrigger value="transactions">Transactions</TabsTrigger>
               <TabsTrigger value="charts">Analytics</TabsTrigger>
               <TabsTrigger value="ornaments">Ornaments</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="bills" className="space-y-4">
+              {/* Bill Filters */}
+              <div className="grid grid-cols-5 gap-4">
+                <Select value={billIdFilter} onValueChange={setBillIdFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Bill ID" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Bills</SelectItem>
+                    {Array.from(new Set(bills.filter(b => b.customerId === customer?.id).map(b => b.billId))).map(id => (
+                      <SelectItem key={id} value={id}>{id}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={billTypeFilter} onValueChange={setBillTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="released">Released</SelectItem>
+                    <SelectItem value="cleared">Cleared</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'amount' | 'date')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sort By" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Date</SelectItem>
+                    <SelectItem value="amount">Amount</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'asc' | 'desc')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">Descending</SelectItem>
+                    <SelectItem value="asc">Ascending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Bills List */}
+              <div className="grid gap-4">
+                {customerBills.map((bill) => (
+                  <Card key={bill.id}>
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">Bill #{bill.billId}</h3>
+                            <Badge variant={bill.status === 'active' ? 'default' : bill.status === 'released' ? 'secondary' : 'outline'}>
+                              {bill.status}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            <div>Created: {format(new Date(bill.createdAt), 'dd MMM yyyy')}</div>
+                            {bill.releasedAt && <div>Released: {format(new Date(bill.releasedAt), 'dd MMM yyyy')}</div>}
+                            {bill.clearedAt && <div>Cleared: {format(new Date(bill.clearedAt), 'dd MMM yyyy')}</div>}
+                            <div>Interest Rate: {bill.interestRate}%</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-primary">₹{bill.amount.toLocaleString()}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Interest Paid: ₹{bill.totalInterestPaid.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {customerBills.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No bills found
+                  </div>
+                )}
+              </div>
+            </TabsContent>
 
             <TabsContent value="transactions" className="space-y-4">
               {/* Filters */}
