@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Phone, MapPin, User, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+import BillDetailsDialog from '@/components/BillDetailsDialog';
 
 interface CustomerDetailsDialogProps {
   customer: Customer | null;
@@ -29,6 +30,8 @@ const CustomerDetailsDialog = ({ customer, open, onOpenChange }: CustomerDetails
   const [billTypeFilter, setBillTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'amount' | 'date'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedBillId, setSelectedBillId] = useState<string>('');
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const customerTransactions = useMemo(() => {
     if (!customer) return [];
@@ -98,7 +101,15 @@ const CustomerDetailsDialog = ({ customer, open, onOpenChange }: CustomerDetails
       filtered = filtered.filter(t => relevantBillIds.includes(t.billId));
     }
 
-    return filtered;
+    // Group transactions by bill to show only latest status (like DayBook)
+    const billTransactions = new Map();
+    filtered.forEach(t => {
+      if (!billTransactions.has(t.billId) || new Date(t.date) > new Date(billTransactions.get(t.billId).date)) {
+        billTransactions.set(t.billId, t);
+      }
+    });
+
+    return Array.from(billTransactions.values());
   }, [customerTransactions, yearFilter, monthFilter, ornamentTypeFilter, metalTypeFilter, customerBills, ornaments]);
 
   const availableYears = useMemo(() => {
@@ -144,6 +155,44 @@ const CustomerDetailsDialog = ({ customer, open, onOpenChange }: CustomerDetails
   const activeLoans = useMemo(() => {
     return customerBills.filter(b => b.status === 'active').length;
   }, [customerBills]);
+
+  const getBillStatus = (billId: string) => {
+    const bill = bills.find(b => b.billId === billId);
+    return bill?.status || 'active';
+  };
+
+  const getBillDate = (billId: string) => {
+    const bill = bills.find(b => b.billId === billId);
+    if (!bill) return '';
+    if (bill.status === 'cleared' && bill.clearedAt) {
+      return `Cleared: ${format(new Date(bill.clearedAt), 'dd MMM yyyy')}`;
+    }
+    if (bill.status === 'released' && bill.releasedAt) {
+      return `Released: ${format(new Date(bill.releasedAt), 'dd MMM yyyy')}`;
+    }
+    return `Created: ${format(new Date(bill.createdAt), 'dd MMM yyyy')}`;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-primary/10 text-primary';
+      case 'released':
+        return 'bg-accent/10 text-accent';
+      case 'cleared':
+        return 'bg-secondary text-secondary-foreground';
+      default:
+        return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const handleTransactionClick = (transaction: any) => {
+    const bill = bills.find(b => b.billId === transaction.billId);
+    if (bill) {
+      setSelectedBillId(bill.id);
+      setIsDetailsOpen(true);
+    }
+  };
 
   if (!customer) return null;
 
@@ -357,36 +406,40 @@ const CustomerDetailsDialog = ({ customer, open, onOpenChange }: CustomerDetails
                 </Select>
               </div>
 
-              {/* Transactions Table */}
+              {/* Bill History */}
               <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Bill ID</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTransactions.map((transaction) => (
-                        <TableRow key={transaction.id}>
-                          <TableCell>{format(new Date(transaction.date), 'dd MMM yyyy')}</TableCell>
-                          <TableCell>{transaction.billId}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{transaction.type.replace(/_/g, ' ')}</Badge>
-                          </TableCell>
-                          <TableCell>{transaction.description}</TableCell>
-                          <TableCell className="text-right font-medium">₹{transaction.amount.toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {filteredTransactions.length === 0 && (
+                <CardContent className="p-4">
+                  {filteredTransactions.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No transactions found
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredTransactions.map((transaction) => {
+                        const status = getBillStatus(transaction.billId);
+                        return (
+                          <div
+                            key={transaction.id}
+                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                            onClick={() => handleTransactionClick(transaction)}
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium">Bill #{transaction.billId}</p>
+                                <Badge className={getStatusColor(status)}>
+                                  {status.charAt(0).toUpperCase() + status.slice(1)} Bill
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{getBillDate(transaction.billId)}</p>
+                            </div>
+                            <div className="text-right ml-4">
+                              <p className="font-semibold text-lg text-primary">
+                                ₹{transaction.amount.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -507,6 +560,14 @@ const CustomerDetailsDialog = ({ customer, open, onOpenChange }: CustomerDetails
           </Tabs>
         </div>
       </DialogContent>
+
+      {selectedBillId && (
+        <BillDetailsDialog
+          billId={selectedBillId}
+          open={isDetailsOpen}
+          onOpenChange={setIsDetailsOpen}
+        />
+      )}
     </Dialog>
   );
 };
