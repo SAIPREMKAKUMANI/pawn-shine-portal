@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import BillDetailsDialog from './BillDetailsDialog';
 
 interface BillCreationDialogProps {
   open: boolean;
@@ -18,9 +20,12 @@ interface BillCreationDialogProps {
 }
 
 const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => {
-  const { customers, addBill, addOrnaments, transactions } = useData();
+  const { customers, bills, addBill, addOrnaments, ornaments: allOrnaments } = useData();
   const [selectedCustomer, setSelectedCustomer] = useState('');
-  const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
+  const [customerBills, setCustomerBills] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedBillId, setSelectedBillId] = useState<string>('');
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [billData, setBillData] = useState({
@@ -29,22 +34,30 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
     interestRate: '',
   });
   const [ornaments, setOrnaments] = useState<any[]>([
-    { name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }
+    { ornamentId: '', name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }
   ]);
+  const [newOrnamentName, setNewOrnamentName] = useState('');
+  const [showNewOrnamentDialog, setShowNewOrnamentDialog] = useState(false);
 
   useEffect(() => {
     if (selectedCustomer) {
-      const customerTxns = transactions.filter(t => t.customerId === selectedCustomer);
-      setCustomerTransactions(customerTxns);
-      setShowHistory(customerTxns.length > 0);
+      const customerBillsList = bills.filter(b => b.customerId === selectedCustomer);
+      setCustomerBills(customerBillsList);
+      setShowHistory(customerBillsList.length > 0);
     } else {
-      setCustomerTransactions([]);
+      setCustomerBills([]);
       setShowHistory(false);
     }
-  }, [selectedCustomer, transactions]);
+  }, [selectedCustomer, bills]);
+
+  const filteredCustomerBills = statusFilter === 'all' 
+    ? customerBills 
+    : customerBills.filter(b => b.status === statusFilter);
+
+  const uniqueOrnamentNames = Array.from(new Set(allOrnaments.map(o => o.name)));
 
   const addOrnamentRow = () => {
-    setOrnaments([...ornaments, { name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }]);
+    setOrnaments([...ornaments, { ornamentId: '', name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }]);
   };
 
   const removeOrnamentRow = (index: number) => {
@@ -53,7 +66,24 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
 
   const updateOrnament = (index: number, field: string, value: string) => {
     const updated = [...ornaments];
-    updated[index] = { ...updated[index], [field]: value };
+    
+    if (field === 'ornamentId' && value !== 'new') {
+      const selectedOrnament = allOrnaments.find(o => o.id === value);
+      if (selectedOrnament) {
+        updated[index] = { 
+          ...updated[index], 
+          ornamentId: value,
+          name: selectedOrnament.name,
+          type: selectedOrnament.type,
+          grossWeight: selectedOrnament.grossWeight.toString(),
+          netWeight: selectedOrnament.netWeight.toString(),
+          interest: selectedOrnament.interest.toString()
+        };
+      }
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
+    
     setOrnaments(updated);
   };
 
@@ -96,10 +126,11 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
     toast.success('Bill created successfully!');
     
     setBillData({ billId: '', amount: '', interestRate: '' });
-    setOrnaments([{ name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }]);
+    setOrnaments([{ ornamentId: '', name: '', type: 'gold', grossWeight: '', netWeight: '', interest: '', image: '' }]);
     setSelectedCustomer('');
-    setCustomerTransactions([]);
+    setCustomerBills([]);
     setShowHistory(false);
+    setStatusFilter('all');
     onOpenChange(false);
   };
 
@@ -196,21 +227,45 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
             </div>
           </div>
 
-          {showHistory && customerTransactions.length > 0 && (
+          {showHistory && customerBills.length > 0 && (
             <Card className="bg-muted/50">
-              <CardHeader>
-                <CardTitle className="text-sm">Customer Transaction History</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-sm">Previous Customer Bills</CardTitle>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="released">Released</SelectItem>
+                    <SelectItem value="cleared">Cleared</SelectItem>
+                  </SelectContent>
+                </Select>
               </CardHeader>
               <CardContent className="space-y-2 max-h-48 overflow-y-auto">
-                {customerTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(txn => (
-                  <div key={txn.id} className="flex justify-between items-center text-sm p-2 bg-background rounded">
+                {filteredCustomerBills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(bill => (
+                  <div 
+                    key={bill.id} 
+                    onClick={() => {
+                      setSelectedBillId(bill.billId);
+                      setIsDetailsOpen(true);
+                    }}
+                    className="flex justify-between items-center text-sm p-2 bg-background rounded cursor-pointer hover:bg-accent transition-colors"
+                  >
                     <div className="flex-1">
-                      <span className="font-medium">{txn.type.replace(/_/g, ' ').toUpperCase()}</span>
-                      <p className="text-xs text-muted-foreground">{txn.description}</p>
+                      <span className="font-medium">Bill ID: {bill.billId}</span>
+                      <Badge 
+                        variant={bill.status === 'active' ? 'default' : bill.status === 'released' ? 'secondary' : 'outline'}
+                        className="ml-2"
+                      >
+                        {bill.status}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-1">Created: {new Date(bill.createdAt).toLocaleDateString()}</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-semibold text-primary">₹{txn.amount.toLocaleString()}</span>
-                      <p className="text-xs text-muted-foreground">{new Date(txn.date).toLocaleDateString()}</p>
+                      <span className="font-semibold text-primary">₹{bill.amount.toLocaleString()}</span>
+                      <p className="text-xs text-muted-foreground">{bill.interestRate}% interest</p>
                     </div>
                   </div>
                 ))}
@@ -231,15 +286,45 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
               <Card key={index}>
                 <CardContent className="pt-6">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Ornament Name</Label>
-                      <Input
-                        value={ornament.name}
-                        onChange={(e) => updateOrnament(index, 'name', e.target.value)}
-                        placeholder="e.g., Gold Chain"
-                        required
-                      />
+                    <div className="space-y-2 col-span-2">
+                      <Label>Select Ornament</Label>
+                      <Select 
+                        value={ornament.ornamentId} 
+                        onValueChange={(value) => {
+                          if (value === 'new') {
+                            updateOrnament(index, 'ornamentId', 'new');
+                            updateOrnament(index, 'name', '');
+                          } else {
+                            updateOrnament(index, 'ornamentId', value);
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select or create new ornament" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="new">+ Create New Ornament</SelectItem>
+                          {uniqueOrnamentNames.map((name) => (
+                            <SelectItem key={name} value={allOrnaments.find(o => o.name === name)?.id || name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
+                    
+                    {ornament.ornamentId === 'new' && (
+                      <div className="space-y-2 col-span-2">
+                        <Label>New Ornament Name</Label>
+                        <Input
+                          value={ornament.name}
+                          onChange={(e) => updateOrnament(index, 'name', e.target.value)}
+                          placeholder="e.g., Gold Chain"
+                          required
+                        />
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label>Metal Type</Label>
                       <Select value={ornament.type} onValueChange={(value) => updateOrnament(index, 'type', value)}>
@@ -251,6 +336,16 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
                           <SelectItem value="silver">Silver</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Gross Weight (g)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={ornament.grossWeight}
+                        onChange={(e) => updateOrnament(index, 'grossWeight', e.target.value)}
+                        required
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Gross Weight (g)</Label>
@@ -315,6 +410,12 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
           </Button>
         </form>
       </DialogContent>
+      
+      <BillDetailsDialog
+        billId={selectedBillId}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+      />
     </Dialog>
   );
 };

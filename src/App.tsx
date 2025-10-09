@@ -11,6 +11,7 @@ import Customers from "./pages/Customers";
 import Bills from "./pages/Bills";
 import DayBook from "./pages/DayBook";
 import Accounts from "./pages/Accounts";
+import Ornaments from "./pages/Ornaments";
 import Layout from "./components/Layout";
 import NotFound from "./pages/NotFound";
 
@@ -33,10 +34,11 @@ const App = () => (
               <Route path="/" element={<Login />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-              <Route path="/bills" element={<ProtectedRoute><Bills /></ProtectedRoute>} />
-              <Route path="/daybook" element={<ProtectedRoute><DayBook /></ProtectedRoute>} />
-              <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
+          <Route path="/bills" element={<ProtectedRoute><Bills /></ProtectedRoute>} />
+          <Route path="/daybook" element={<ProtectedRoute><DayBook /></ProtectedRoute>} />
+          <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+          <Route path="/ornaments" element={<ProtectedRoute><Ornaments /></ProtectedRoute>} />
+          <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
