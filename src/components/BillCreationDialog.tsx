@@ -246,9 +246,10 @@ const BillCreationDialog = ({ open, onOpenChange }: BillCreationDialogProps) => 
                   {filteredCustomerBills.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(bill => (
                     <div 
                       key={bill.id} 
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setSelectedBillId(bill.billId);
-                        setIsDetailsOpen(true);
+                        setTimeout(() => setIsDetailsOpen(true), 0);
                       }}
                       className="flex justify-between items-center text-sm p-2 bg-background rounded cursor-pointer hover:bg-accent transition-colors"
                     >

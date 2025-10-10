@@ -2,12 +2,11 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 interface User {
   username: string;
-  shopName: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string, shopName: string) => boolean;
+  login: (username: string, password: string) => boolean;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -24,10 +23,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const login = (username: string, password: string, shopName: string) => {
-    // Simple frontend authentication
+  const login = (username: string, password: string) => {
+    // Simple frontend authentication - will be replaced with JWT
     if (username && password) {
-      const userData = { username, shopName };
+      const userData = { username };
       setUser(userData);
       localStorage.setItem('pawn_user', JSON.stringify(userData));
       return true;

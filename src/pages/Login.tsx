@@ -11,13 +11,12 @@ import { toast } from 'sonner';
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [shopName, setShopName] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(username, password, shopName)) {
+    if (login(username, password)) {
       toast.success('Login successful!');
       navigate('/dashboard');
     } else {
@@ -39,16 +38,6 @@ const Login = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="shopName">Shop Name</Label>
-              <Input
-                id="shopName"
-                placeholder="Enter shop name"
-                value={shopName}
-                onChange={(e) => setShopName(e.target.value)}
-                required
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
               <Input
