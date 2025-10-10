@@ -85,8 +85,8 @@ const DayBook = () => {
   const handleTransactionClick = (transaction: any) => {
     const bill = bills.find(b => b.billId === transaction.billId);
     if (bill) {
-      setSelectedBillId(bill.id);
-      setIsDetailsOpen(true);
+      setSelectedBillId(bill.billId);
+      setTimeout(() => setIsDetailsOpen(true), 0);
     }
   };
 
