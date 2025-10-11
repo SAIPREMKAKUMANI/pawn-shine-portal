@@ -73,35 +73,99 @@ const Login = () => {
           </div>
           <CardTitle className="text-3xl font-bold">Gold Pawn Broking</CardTitle>
           <CardDescription>
-            {isRegistering ? 'Register your biometric credential' : 'Sign in with biometric authentication'}
+            {isRegistering ? 'Register your biometric credential' : 'Sign in to your account'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Biometric Login Button */}
-          {isBiometricAvailable && hasBiometricCredential && !isRegistering && (
-            <Button 
-              onClick={handleBiometricLogin} 
-              className="w-full gap-2"
-              variant="default"
-            >
-              <Fingerprint className="h-5 w-5" />
-              Sign In with Biometrics
-            </Button>
-          )}
+          {!isRegistering ? (
+            <>
+              {/* Username/Password Login Form */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    placeholder="Enter username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full">
+                  Sign In
+                </Button>
+              </form>
 
-          {/* Registration Form */}
-          {isRegistering && (
+              {/* Divider */}
+              {isBiometricAvailable && (
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or continue with
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Biometric Login Button */}
+              {isBiometricAvailable && hasBiometricCredential && (
+                <Button 
+                  onClick={handleBiometricLogin} 
+                  className="w-full gap-2"
+                  variant="outline"
+                >
+                  <Fingerprint className="h-5 w-5" />
+                  Sign In with Biometrics
+                </Button>
+              )}
+
+              {/* Register Biometric Option */}
+              {isBiometricAvailable && !hasBiometricCredential && (
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Enable biometric login for faster access
+                  </p>
+                  <Button 
+                    onClick={() => setIsRegistering(true)} 
+                    variant="outline"
+                    className="w-full gap-2"
+                  >
+                    <Fingerprint className="h-5 w-5" />
+                    Setup Biometric Login
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            /* Biometric Registration Form */
             <form onSubmit={handleBiometricRegister} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="reg-username">Username</Label>
                 <Input
-                  id="username"
-                  placeholder="Enter username"
+                  id="reg-username"
+                  placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
                 />
               </div>
+              <p className="text-sm text-muted-foreground">
+                You'll be prompted to use your device's biometric sensor (fingerprint, face ID, etc.)
+              </p>
               <Button type="submit" className="w-full gap-2">
                 <Fingerprint className="h-5 w-5" />
                 Register Biometric
@@ -110,37 +174,14 @@ const Login = () => {
                 type="button" 
                 variant="outline" 
                 className="w-full"
-                onClick={() => setIsRegistering(false)}
+                onClick={() => {
+                  setIsRegistering(false);
+                  setUsername('');
+                }}
               >
                 Cancel
               </Button>
             </form>
-          )}
-
-          {/* Show registration option if no credential exists */}
-          {isBiometricAvailable && !hasBiometricCredential && !isRegistering && (
-            <div className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
-                No biometric credential registered
-              </p>
-              <Button 
-                onClick={() => setIsRegistering(true)} 
-                variant="outline"
-                className="w-full gap-2"
-              >
-                <Fingerprint className="h-5 w-5" />
-                Register Biometric
-              </Button>
-            </div>
-          )}
-
-          {/* Fallback message if biometric not available */}
-          {!isBiometricAvailable && (
-            <div className="text-center p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Biometric authentication is not available on this device
-              </p>
-            </div>
           )}
         </CardContent>
       </Card>
