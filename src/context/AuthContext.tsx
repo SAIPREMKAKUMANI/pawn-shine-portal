@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<boolean>;
   loginWithBiometric: () => Promise<boolean>;
-  registerBiometric: (username: string) => Promise<boolean>;
+  registerBiometric: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
   hasBiometricCredential: boolean;
@@ -55,12 +55,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const registerBiometric = async (username: string) => {
+  const registerBiometric = async (username: string, password: string) => {
     try {
+      // First validate credentials
+      const loginResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!loginResponse.ok) return false;
+
+      const { token } = await loginResponse.json();
+
       // Request registration options from backend
       const optionsResponse = await fetch('/api/auth/webauthn/register/options', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ username }),
       });
 
@@ -86,7 +100,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const response = credential.response as AuthenticatorAttestationResponse;
       const verifyResponse = await fetch('/api/auth/webauthn/register/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           username,
           id: credential.id,
