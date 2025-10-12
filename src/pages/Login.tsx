@@ -5,12 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Fingerprint, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [setupUsername, setSetupUsername] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
   const { login, loginWithBiometric, registerBiometric, hasBiometricCredential } = useAuth();
   const navigate = useNavigate();
@@ -44,20 +48,21 @@ const Login = () => {
     }
   };
 
-  const handleLoginAndRegisterBiometric = async (e: React.FormEvent) => {
+  const handleBiometricSetup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
+    if (!setupUsername || !setupPassword) {
       toast.error('Please enter username and password');
       return;
     }
     
-    const success = await registerBiometric(username, password);
+    const success = await registerBiometric(setupUsername, setupPassword);
     if (success) {
       toast.success('Biometric registered successfully! You can now login with biometrics.');
-      setUsername('');
-      setPassword('');
+      setShowBiometricSetup(false);
+      setSetupUsername('');
+      setSetupPassword('');
     } else {
-      toast.error('Failed to register biometric. Please check your credentials.');
+      toast.error('Invalid credentials or biometric registration failed');
     }
   };
 
@@ -132,39 +137,78 @@ const Login = () => {
 
           {/* Register Biometric Option */}
           {isBiometricAvailable && !hasBiometricCredential && (
-            <form onSubmit={handleLoginAndRegisterBiometric} className="space-y-4">
-              <p className="text-sm text-muted-foreground text-center">
-                Setup biometric login for faster access
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Enable biometric login for faster access
               </p>
-              <div className="space-y-2">
-                <Label htmlFor="bio-username">Username</Label>
-                <Input
-                  id="bio-username"
-                  placeholder="Enter username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bio-password">Password</Label>
-                <Input
-                  id="bio-password"
-                  type="password"
-                  placeholder="Enter password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full gap-2">
+              <Button 
+                onClick={() => setShowBiometricSetup(true)} 
+                variant="outline"
+                className="w-full gap-2"
+              >
                 <Fingerprint className="h-5 w-5" />
                 Setup Biometric Login
               </Button>
-            </form>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Biometric Setup Dialog */}
+      <Dialog open={showBiometricSetup} onOpenChange={setShowBiometricSetup}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Setup Biometric Login</DialogTitle>
+            <DialogDescription>
+              Enter your credentials to enable biometric authentication
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleBiometricSetup} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="setup-username">Username</Label>
+              <Input
+                id="setup-username"
+                placeholder="Enter username"
+                value={setupUsername}
+                onChange={(e) => setSetupUsername(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="setup-password">Password</Label>
+              <Input
+                id="setup-password"
+                type="password"
+                placeholder="Enter password"
+                value={setupPassword}
+                onChange={(e) => setSetupPassword(e.target.value)}
+                required
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              After validation, you'll be prompted to use your device's biometric sensor
+            </p>
+            <div className="flex gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => {
+                  setShowBiometricSetup(false);
+                  setSetupUsername('');
+                  setSetupPassword('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1 gap-2">
+                <Fingerprint className="h-5 w-5" />
+                Continue
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
