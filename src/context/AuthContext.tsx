@@ -134,13 +134,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const credentialId = localStorage.getItem('webauthn_credential_id');
       const username = localStorage.getItem('webauthn_username');
       
-      if (!credentialId || !username) return false;
+      // Use discoverable credentials if localStorage is empty
+      const useDiscoverableCredentials = !credentialId || !username;
 
       // Request authentication options from backend
       const optionsResponse = await fetch('/api/auth/webauthn/login/options', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ 
+          username: useDiscoverableCredentials ? undefined : username 
+        }),
       });
 
       if (!optionsResponse.ok) return false;
@@ -152,10 +155,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         publicKey: {
           ...options,
           challenge: Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0)),
-          allowCredentials: options.allowCredentials.map((cred: any) => ({
-            ...cred,
-            id: Uint8Array.from(atob(cred.id), c => c.charCodeAt(0)),
-          })),
+          // For discoverable credentials, use empty allowCredentials or omit username-specific credentials
+          allowCredentials: useDiscoverableCredentials 
+            ? [] 
+            : options.allowCredentials.map((cred: any) => ({
+                ...cred,
+                id: Uint8Array.from(atob(cred.id), c => c.charCodeAt(0)),
+              })),
         },
       }) as PublicKeyCredential;
 
@@ -167,7 +173,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username,
+          username: useDiscoverableCredentials ? undefined : username,
           id: credential.id,
           rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
           type: credential.type,
@@ -182,10 +188,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (verifyResponse.ok) {
         const data = await verifyResponse.json();
-        const userData = { username };
+        const retrievedUsername = data.username || username;
+        const userData = { username: retrievedUsername };
         setUser(userData);
         localStorage.setItem('pawn_user', JSON.stringify(userData));
         localStorage.setItem('jwt_token', data.token);
+        localStorage.setItem('webauthn_credential_id', credential.id);
+        localStorage.setItem('webauthn_username', retrievedUsername);
         return true;
       }
       return false;
