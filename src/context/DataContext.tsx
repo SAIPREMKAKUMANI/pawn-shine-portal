@@ -9,6 +9,10 @@ export interface Customer {
   fatherHusbandVillage: string;
   image?: string;
   description?: string;
+  email?: string;
+  idProofType?: string;
+  idProofNum?: string;
+  idProofImage?: string;
   createdAt: string;
 }
 

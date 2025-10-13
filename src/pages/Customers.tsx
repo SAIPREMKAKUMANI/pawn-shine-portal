@@ -17,6 +17,7 @@ const Customers = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     village: '',
@@ -25,6 +26,10 @@ const Customers = () => {
     fatherHusbandVillage: '',
     image: '',
     description: '',
+    email: '',
+    idProofType: '',
+    idProofNum: '',
+    idProofImage: '',
   });
 
   const filteredCustomers = customers.filter(
@@ -45,6 +50,17 @@ const Customers = () => {
     }
   };
 
+  const handleIdProofImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, idProofImage: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     addCustomer(formData);
@@ -57,7 +73,12 @@ const Customers = () => {
       fatherHusbandVillage: '',
       image: '',
       description: '',
+      email: '',
+      idProofType: '',
+      idProofNum: '',
+      idProofImage: '',
     });
+    setShowDropdown(false);
     setIsDialogOpen(false);
   };
 
@@ -113,10 +134,14 @@ const Customers = () => {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, name: e.target.value });
+                        setShowDropdown(true);
+                      }}
+                      onFocus={() => setShowDropdown(true)}
                       required
                     />
-                    {formData.name && filteredCustomers.length > 0 && (
+                    {showDropdown && formData.name && filteredCustomers.length > 0 && (
                       <Card className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto">
                         <CardContent className="p-2">
                           {filteredCustomers.slice(0, 5).map((customer) => (
@@ -132,7 +157,12 @@ const Customers = () => {
                                   fatherHusbandVillage: customer.fatherHusbandVillage,
                                   image: customer.image || '',
                                   description: customer.description || '',
+                                  email: customer.email || '',
+                                  idProofType: customer.idProofType || '',
+                                  idProofNum: customer.idProofNum || '',
+                                  idProofImage: customer.idProofImage || '',
                                 });
+                                setShowDropdown(false);
                               }}
                             >
                               <div className="font-medium">{customer.name}</div>
@@ -162,6 +192,15 @@ const Customers = () => {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="email">Email (Optional)</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="fatherHusbandName">Father/Husband Name</Label>
                     <Input
                       id="fatherHusbandName"
@@ -170,7 +209,7 @@ const Customers = () => {
                       required
                     />
                   </div>
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2">
                     <Label htmlFor="fatherHusbandVillage">Father/Husband Village</Label>
                     <Input
                       id="fatherHusbandVillage"
@@ -179,6 +218,39 @@ const Customers = () => {
                       required
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="idProofType">ID Proof Type</Label>
+                    <Input
+                      id="idProofType"
+                      value={formData.idProofType}
+                      onChange={(e) => setFormData({ ...formData, idProofType: e.target.value })}
+                      placeholder="e.g. Aadhar, PAN, Passport"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="idProofNum">ID Proof Number</Label>
+                    <Input
+                      id="idProofNum"
+                      value={formData.idProofNum}
+                      onChange={(e) => setFormData({ ...formData, idProofNum: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="idProofImage">ID Proof Image (Optional)</Label>
+                  <Input
+                    id="idProofImage"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleIdProofImageUpload}
+                    className="cursor-pointer"
+                  />
+                  {formData.idProofImage && (
+                    <div className="mt-2">
+                      <img src={formData.idProofImage} alt="ID Proof" className="h-32 w-auto rounded border" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
