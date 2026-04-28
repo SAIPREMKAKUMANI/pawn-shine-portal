@@ -1,0 +1,202 @@
+/*
+ * Site color palette (matched from screenshot)
+ *   Primary gold  : #D4860A   (button bg, active nav)
+ *   Gold hover    : #B8730A
+ *   Heading text  : #7C4E04   (dark amber-brown)
+ *   Subtitle      : #C8870A   (muted gold)
+ *   Border/input  : #E8C068   (light gold border)
+ *   Bg surface    : #FFFDF7   (warm off-white page bg)
+ *   Card bg       : #FFFFFF
+ */
+
+.section-card {
+  border: 1px solid #EDD898;
+  background: #FDFAF2;
+}
+
+.site-label {
+  color: #7C4E04;
+}
+
+.site-input {
+  border-color: #E8C068;
+  color: #4A2C00;
+}
+
+.site-input::placeholder {
+  color: #D4A855;
+}
+
+.site-select-trigger {
+  border-color: #E8C068 !important;
+  color: #4A2C00;
+}
+
+.add-item-btn {
+  color: #D4860A;
+}
+
+.add-item-btn:hover {
+  color: #7C4E04;
+}
+
+.page-header h1 {
+    color: #7C4E04;
+}
+
+.page-header p {
+    color: #C8870A;
+}
+
+.add-customer-btn {
+    background-color: #D4860A;
+}
+
+.add-customer-btn:hover {
+    background-color: #B8730A;
+}
+
+.dialog-content {
+    border-color: #E8C068;
+}
+
+.dialog-header {
+    background: linear-gradient(135deg, #C47A08 0%, #E8A020 100%);
+}
+
+.dialog-header p {
+    color: #FDE8B0;
+}
+
+.tab-bar {
+    background: #FFFDF7;
+    border-color: #EDD898;
+}
+
+.tab-button.active {
+    background: #D4860A;
+    color: #fff;
+    border-bottom-color: #D4860A;
+}
+
+.tab-button {
+    color: #A0650A;
+    background: transparent;
+    border-bottom-color: transparent;
+}
+
+.form-body {
+    background: #FFFDF7;
+}
+
+.customer-avatar {
+    outline: 2px solid #E8C068;
+    outline-offset: 2px;
+}
+
+.customer-avatar-fallback {
+    background: #FDE8B0;
+    color: #7C4E04;
+}
+
+.suggestion-dropdown {
+    border: 1px solid #E8C068;
+    background: #fff;
+    top: 100%;
+}
+
+.suggestion-header {
+    background: #FDF3DC;
+    border-bottom: 1px solid #EDD898;
+}
+
+.suggestion-header-title {
+    color: #A0650A;
+}
+
+.suggestion-header-count {
+    color: #C8870A;
+}
+
+.suggestion-item {
+    border-bottom: 1px solid #FAF0D0;
+}
+
+.suggestion-item:hover {
+    background: #FDF3DC;
+}
+
+.suggestion-item-name {
+    color: #4A2C00;
+}
+
+.suggestion-item-details {
+    color: #A0650A;
+}
+
+.suggestion-item-arrow {
+    color: #D4860A;
+}
+
+.description-textarea {
+    border: 1px solid #E8C068;
+    color: #4A2C00;
+}
+
+.form-footer {
+    background: #FDF3DC;
+    border-color: #EDD898;
+}
+
+.form-footer-btn-back {
+    border-color: #E8C068;
+    color: #7C4E04;
+}
+
+.form-footer-btn-next {
+    background: #FDE8B0;
+    color: #7C4E04;
+    border: 1px solid #E8C068;
+}
+
+.search-icon {
+    color: #D4A855;
+}
+
+.customer-card {
+    border: 1px solid #EDD898;
+}
+
+.customer-card:hover {
+    box-shadow: 0 6px 24px rgba(212,134,10,0.20);
+}
+
+.customer-card-avatar {
+    outline: 2px solid #E8C068;
+    outline-offset: 1px;
+}
+
+.customer-card-avatar-fallback {
+    background: #FDE8B0;
+    color: #7C4E04;
+}
+
+.customer-card-name {
+    color: #4A2C00;
+}
+
+.customer-card-details {
+    color: #A0650A;
+}
+
+.customer-card-icon {
+    color: #D4860A;
+}
+
+.no-customer-found-icon {
+    color: #E8C068;
+}
+
+.no-customer-found-text {
+    color: #C8870A;
+}
