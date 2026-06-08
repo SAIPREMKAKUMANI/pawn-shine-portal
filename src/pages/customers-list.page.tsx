@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useCustomersPage, useCustomerCount } from "@/hooks/use-customers.hook";
+import { useAuthImage } from "@/hooks/use-auth-image.hook";
 import { Search, UserPlus, Users } from "lucide-react";
 import type { CustomerBase } from "@/types/api.types";
 
@@ -19,6 +20,11 @@ function CustomerCard({ customer }: { customer: CustomerBase }) {
     .toUpperCase()
     .slice(0, 2);
 
+  const imageUrl = customer.image_url 
+    ? `/api/images/${customer.cust_id}/PROFILE.${customer.image_url.split('.').pop()}` 
+    : null;
+  const authImageUrl = useAuthImage(imageUrl);
+
   return (
     <Card
       className="cursor-pointer hover:shadow-[var(--shadow-gold)] transition-all duration-300 hover:-translate-y-1"
@@ -26,8 +32,8 @@ function CustomerCard({ customer }: { customer: CustomerBase }) {
     >
       <CardContent className="p-4 flex items-center gap-4">
         <Avatar className="h-12 w-12 bg-primary/10">
-          {customer.image_url ? (
-            <AvatarImage src={`http://localhost:8080/api/images/${customer.cust_id}/PROFILE.${customer.image_url.split('.').pop()}`} alt={customer.name} className="object-cover" />
+          {customer.image_url && authImageUrl ? (
+            <AvatarImage src={authImageUrl} alt={customer.name} className="object-cover" />
           ) : null}
           <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold">
             {initials}

@@ -33,6 +33,11 @@ export enum TransactionType {
   DEBIT = "DEBIT",
 }
 
+export enum WalletTransactionType {
+  DEPOSIT = "DEPOSIT",
+  WITHDRAWAL = "WITHDRAWAL",
+}
+
 export enum ItemStatus {
   ACTIVE = "ACTIVE",
   REDEEMED = "REDEEMED",
@@ -42,8 +47,14 @@ export enum ItemStatus {
 }
 
 export enum BillType {
-  CREDIT = "CREDIT",
-  DEBIT = "DEBIT",
+  PLEDGE = "PLEDGE",
+  REDEEM = "REDEEM",
+}
+
+export enum BillStatus {
+  ACTIVE = "ACTIVE",
+  PARTIALLY_REDEEMED = "PARTIALLY_REDEEMED",
+  REDEEMED = "REDEEMED",
 }
 
 export enum BillItemAction {

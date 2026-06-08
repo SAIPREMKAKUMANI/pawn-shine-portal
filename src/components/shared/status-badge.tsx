@@ -11,6 +11,7 @@ const STATUS_STYLES: Record<string, string> = {
   [ItemStatus.DEFAULTED]: "bg-red-500/15 text-red-700 border-red-200",
   [ItemStatus.HOLD]: "bg-amber-500/15 text-amber-700 border-amber-200",
   [ItemStatus.AUCTIONED]: "bg-purple-500/15 text-purple-700 border-purple-200",
+  "PARTIALLY_REDEEMED": "bg-indigo-500/15 text-indigo-700 border-indigo-200",
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {

@@ -11,10 +11,18 @@ import { useOnboardCustomer, useUpdateCustomer, useCustomerDetail } from "@/hook
 import { customerOnboardSchema, type CustomerOnboardFormValues } from "@/validators/customer.schema";
 import { Gender, MaritalStatus } from "@/types/enums";
 import { ArrowLeft, Plus, Trash2, Loader2, Image as ImageIcon, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import { useAuthImage } from "@/hooks/use-auth-image.hook";
+
+function AuthImage({ src, alt, className }: { src: string; alt?: string; className?: string }) {
+  const authSrc = useAuthImage(src);
+  if (!authSrc) return null;
+  return <img src={authSrc} alt={alt} className={className} />;
+}
 
 function PersonalInfoSection({ form }: { form: ReturnType<typeof useForm<CustomerOnboardFormValues>> }) {
   const profileImage = form.watch("image");
   const profileImageUrl = profileImage instanceof File ? URL.createObjectURL(profileImage) : profileImage;
+  const authProfileImageUrl = useAuthImage(profileImageUrl);
   return (
     <Card>
       <CardHeader><CardTitle>Personal Information</CardTitle></CardHeader>
@@ -28,8 +36,8 @@ function PersonalInfoSection({ form }: { form: ReturnType<typeof useForm<Custome
           <FormItem className="sm:col-span-2">
             <FormLabel>Profile Photo</FormLabel>
             <div className="flex items-center gap-4">
-              {profileImageUrl ? (
-                <img src={profileImageUrl} alt="Preview" className="h-16 w-16 rounded-full object-cover border" />
+              {profileImageUrl && authProfileImageUrl ? (
+                <img src={authProfileImageUrl} alt="Preview" className="h-16 w-16 rounded-full object-cover border" />
               ) : (
                 <div className="h-16 w-16 rounded-full border border-dashed flex items-center justify-center bg-muted/50"><ImageIcon className="h-6 w-6 text-muted-foreground" /></div>
               )}
@@ -111,7 +119,7 @@ function IdProofsSection({ form }: { form: ReturnType<typeof useForm<CustomerOnb
                 <FormItem className="sm:col-span-2">
                   <FormLabel>ID Photo</FormLabel>
                   <div className="flex items-center gap-4">
-                    {idImageUrl && <img src={idImageUrl} alt="ID Preview" className="h-12 w-20 rounded object-cover border" />}
+                    {idImageUrl && <AuthImage src={idImageUrl} alt="ID Preview" className="h-12 w-20 rounded object-cover border" />}
                     <FormControl><Input type="file" accept="image/*" onChange={(e) => field.onChange(e.target.files?.[0])} /></FormControl>
                   </div>
                   <FormMessage />
@@ -147,7 +155,7 @@ function RelativesSection({ form }: { form: ReturnType<typeof useForm<CustomerOn
                 <FormItem className="sm:col-span-3">
                   <FormLabel>Relative Photo</FormLabel>
                   <div className="flex items-center gap-4">
-                    {relImageUrl && <img src={relImageUrl} alt="Relative Preview" className="h-12 w-12 rounded-full object-cover border" />}
+                    {relImageUrl && <AuthImage src={relImageUrl} alt="Relative Preview" className="h-12 w-12 rounded-full object-cover border" />}
                     <FormControl><Input type="file" accept="image/*" onChange={(e) => field.onChange(e.target.files?.[0])} /></FormControl>
                   </div>
                   <FormMessage />
@@ -187,41 +195,46 @@ export default function CustomerOnboardPage() {
   useEffect(() => {
     if (customerData) {
       form.reset({
-        name: customerData.name,
-        date_of_birth: customerData.date_of_birth,
+        name: customerData.name || "",
+        date_of_birth: customerData.date_of_birth || "",
         gender: customerData.gender,
         marital_status: customerData.marital_status,
-        occupation: customerData.occupation,
-        image: customerData.image_url ? `http://localhost:8080/api/images/${customerData.cust_id}/PROFILE.${customerData.image_url.split('.').pop()}` : undefined,
+        occupation: customerData.occupation || "",
+        image: customerData.image_url ? `/api/images/${customerData.cust_id}/PROFILE.${customerData.image_url.split('.').pop()}` : undefined,
         contacts: customerData.contacts.map(c => ({
-          phone: c.phone,
-          secondary_phone: c.secondary_phone,
-          whatsapp_phone: c.whatsapp_phone,
-          email: c.email
+          contact_id: c.contact_id,
+          phone: c.phone || "",
+          secondary_phone: c.secondary_phone || "",
+          whatsapp_phone: c.whatsapp_phone || "",
+          email: c.email || ""
         })),
         addresses: customerData.addresses.map(a => ({
-          street: a.street,
-          city: a.city,
-          state: a.state,
-          postal_code: a.postal_code,
-          country: a.country
+          address_id: a.address_id,
+          street: a.street || "",
+          city: a.city || "",
+          state: a.state || "",
+          postal_code: a.postal_code || "",
+          country: a.country || ""
         })),
         id_proofs: customerData.id_proofs.map(ip => ({
-          id_type: ip.id_type,
-          id_number: ip.id_number,
-          image: ip.image_url ? `http://localhost:8080/api/images/${customerData.cust_id}/${ip.id_type}.${ip.image_url.split('.').pop()}` : undefined
+          id_proof_id: ip.id_proof_id,
+          id_type: ip.id_type || "",
+          id_number: ip.id_number || "",
+          image: ip.image_url ? `/api/images/${customerData.cust_id}/${ip.id_type}.${ip.image_url.split('.').pop()}` : undefined
         })),
         relatives: customerData.relatives.map(r => ({
-          name: r.name,
-          relationship: r.relationship,
-          contact_number: r.contact_number,
-          image: r.image_url ? `http://localhost:8080/api/images/${customerData.cust_id}/RELATIVE.${r.image_url.split('.').pop()}` : undefined
+          relative_id: r.relative_id,
+          name: r.name || "",
+          relationship: r.relationship || "",
+          contact_number: r.contact_number || "",
+          image: r.image_url ? `/api/images/${customerData.cust_id}/RELATIVE.${r.image_url.split('.').pop()}` : undefined
         })),
       });
     }
   }, [customerData, form]);
 
-  const validateStep = async () => {
+  const validateStep = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     let isValid = false;
     if (step === 1) {
       isValid = await form.trigger(["name", "date_of_birth", "gender", "marital_status", "occupation", "image"]);
@@ -250,6 +263,7 @@ export default function CustomerOnboardPage() {
     }
 
     values.contacts.forEach((contact, index) => {
+      if (contact.contact_id) formData.append(`contacts[${index}].contactId`, contact.contact_id.toString());
       formData.append(`contacts[${index}].phone`, contact.phone);
       if (contact.secondary_phone) formData.append(`contacts[${index}].secondaryPhone`, contact.secondary_phone);
       if (contact.whatsapp_phone) formData.append(`contacts[${index}].whatsappPhone`, contact.whatsapp_phone);
@@ -257,6 +271,7 @@ export default function CustomerOnboardPage() {
     });
 
     values.addresses.forEach((address, index) => {
+      if (address.address_id) formData.append(`addresses[${index}].addressId`, address.address_id.toString());
       formData.append(`addresses[${index}].street`, address.street);
       formData.append(`addresses[${index}].city`, address.city);
       formData.append(`addresses[${index}].state`, address.state);
@@ -265,6 +280,7 @@ export default function CustomerOnboardPage() {
     });
 
     values.id_proofs.forEach((idProof, index) => {
+      if (idProof.id_proof_id) formData.append(`idProofs[${index}].idProofId`, idProof.id_proof_id.toString());
       formData.append(`idProofs[${index}].idType`, idProof.id_type);
       formData.append(`idProofs[${index}].idNumber`, idProof.id_number);
       if (idProof.image instanceof File) {
@@ -273,6 +289,7 @@ export default function CustomerOnboardPage() {
     });
 
     values.relatives.forEach((relative, index) => {
+      if (relative.relative_id) formData.append(`relatives[${index}].relativeId`, relative.relative_id.toString());
       formData.append(`relatives[${index}].name`, relative.name);
       formData.append(`relatives[${index}].relationship`, relative.relationship);
       formData.append(`relatives[${index}].contactNumber`, relative.contact_number);
@@ -363,7 +380,7 @@ export default function CustomerOnboardPage() {
           <ChevronLeft className="h-4 w-4" /> Previous
         </Button>
         {step < 3 ? (
-          <Button type="button" onClick={validateStep} className="gap-2">
+          <Button type="button" onClick={(e) => validateStep(e)} className="gap-2">
             Next <ChevronRight className="h-4 w-4" />
           </Button>
         ) : (

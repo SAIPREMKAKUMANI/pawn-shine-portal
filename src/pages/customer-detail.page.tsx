@@ -12,7 +12,27 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { useCustomerDetail } from "@/hooks/use-customers.hook";
 import { useCustomerItems } from "@/hooks/use-items.hook";
 import { useCustomerBills } from "@/hooks/use-bills.hook";
-import { ArrowLeft, User, Phone, MapPin, FileText, Package, CreditCard, Users as UsersIcon, Calendar, Edit, Briefcase, Heart } from "lucide-react";
+import { ArrowLeft, User, Phone, MapPin, FileText, Package, CreditCard, Users as UsersIcon, Calendar, Edit, Briefcase, Heart, Wallet, ArrowDownRight, ArrowUpRight, Plus, Loader2 } from "lucide-react";
+
+import { useCustomerWallet, useWalletTransactions, useDepositToWallet } from "@/hooks/use-wallet.hook";
+import { useAccountsList } from "@/hooks/use-accounts.hook";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
+import { useAuthImage } from "@/hooks/use-auth-image.hook";
+
+function AuthImage({ src, alt, className }: { src: string; alt?: string; className?: string }) {
+  const authSrc = useAuthImage(src);
+  if (!authSrc) return null;
+  return <img src={authSrc} alt={alt} className={className} />;
+}
+
+function AuthAvatarImage({ src, alt, className }: { src: string; alt?: string; className?: string }) {
+  const authSrc = useAuthImage(src);
+  if (!authSrc) return null;
+  return <AvatarImage src={authSrc} alt={alt} className={className} />;
+}
 
 function PersonalInfoTab({ customer }: { customer: NonNullable<ReturnType<typeof useCustomerDetail>["data"]> }) {
   return (
@@ -111,17 +131,56 @@ function BillsSection({ customerId }: { customerId: number }) {
 
   return (
     <div className="space-y-3">
-      {bills.map((bill) => (
-        <Card key={bill.id} className="hover:shadow-sm transition-shadow">
-          <CardContent className="p-4 flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <p className="font-medium text-sm">{bill.bill_id}</p>
-              <p className="text-xs text-muted-foreground">{bill.bill_type === "CREDIT" ? "Pledge" : "Redemption"} • <DateDisplay dateString={bill.bill_date} /></p>
-            </div>
-            <CurrencyDisplay amount={bill.total_amount_lended} className="font-semibold" />
-          </CardContent>
-        </Card>
-      ))}
+      {bills.map((bill) => {
+        const isCreditBill = bill.bill_type === "CREDIT";
+        const hasPartialPayment = isCreditBill && bill.amount_paid > 0;
+        const totalDue = bill.total_amount_lended + bill.interest_accumulated;
+        const paidPct = totalDue > 0 ? Math.min(100, (bill.amount_paid / totalDue) * 100) : 0;
+
+        return (
+          <Card
+            key={bill.id}
+            className={`hover:shadow-sm transition-shadow ${hasPartialPayment ? "border-emerald-300/50 dark:border-emerald-700/50" : ""
+              }`}
+          >
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm">{bill.bill_id}</p>
+                    {isCreditBill && <StatusBadge status={bill.status} />}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {isCreditBill ? "Pledge" : "Redemption"} • <DateDisplay dateString={bill.bill_date} />
+                  </p>
+                </div>
+                <div className="text-right">
+                  <CurrencyDisplay amount={bill.total_amount_lended} className="font-semibold" />
+                  {hasPartialPayment && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                      Paid: <CurrencyDisplay amount={bill.amount_paid} className="inline" />
+                    </p>
+                  )}
+                </div>
+              </div>
+              {/* Payment progress bar for partially-paid bills */}
+              {hasPartialPayment && (
+                <div className="space-y-1">
+                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
+                      style={{ width: `${paidPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-right">
+                    {paidPct.toFixed(0)}% paid • Remaining: <CurrencyDisplay amount={totalDue - bill.amount_paid} className="inline text-xs" />
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
@@ -134,7 +193,7 @@ function RelativesTab({ customerId, relatives }: { customerId: number, relatives
           <CardContent className="p-0">
             {relative.image_url && (
               <div className="aspect-video w-full bg-muted overflow-hidden relative">
-                <img src={`http://localhost:8080/api/images/${customerId}/RELATIVE.${relative.image_url.split('.').pop()}`} alt={relative.name} className="object-cover w-full h-full" />
+                <AuthImage src={`/api/images/${customerId}/RELATIVE.${relative.image_url.split('.').pop()}`} alt={relative.name} className="object-cover w-full h-full" />
               </div>
             )}
             <div className="p-4 space-y-2">
@@ -154,6 +213,127 @@ function RelativesTab({ customerId, relatives }: { customerId: number, relatives
     </div>
   );
 }
+
+function WalletSection({ customerId }: { customerId: number }) {
+  const { data: wallet, isLoading: isLoadingWallet } = useCustomerWallet(customerId);
+  const { data: transactions, isLoading: isLoadingTx } = useWalletTransactions(customerId);
+  const { data: accounts } = useAccountsList();
+  const depositMutation = useDepositToWallet();
+
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const activeAccounts = accounts?.filter(a => a.is_active) || [];
+
+  const handleDeposit = () => {
+    if (!amount || !accountId) return;
+    depositMutation.mutate(
+      {
+        custId: customerId,
+        request: {
+          amount: Number(amount),
+          notes: notes,
+          accounts: [{ account_id: Number(accountId), amount: Number(amount) }]
+        }
+      },
+      {
+        onSuccess: () => {
+          setDepositOpen(false);
+          setAmount("");
+          setAccountId("");
+          setNotes("");
+        }
+      }
+    );
+  };
+
+  if (isLoadingWallet || isLoadingTx) return <LoadingSpinner message="Loading wallet..." />;
+
+  const balance = wallet?.balance || 0;
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-500/20 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+              <p className="text-sm font-medium text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
+                <Wallet className="h-4 w-4" /> Available Wallet Balance
+              </p>
+              <h3 className="text-4xl font-bold mt-2 text-foreground"><CurrencyDisplay amount={balance} /></h3>
+              <p className="text-xs text-muted-foreground mt-2">Funds available for partial payments and redemptions.</p>
+            </div>
+
+            <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+              <DialogTrigger asChild>
+                <Button size="lg" className="shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <Plus className="h-5 w-5 mr-2" /> Deposit Funds
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Deposit to Wallet</DialogTitle></DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Amount</label>
+                    <Input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Deposit To Account</label>
+                    <Select value={accountId} onValueChange={setAccountId}>
+                      <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                      <SelectContent>
+                        {activeAccounts.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.bank_name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Notes (Optional)</label>
+                    <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. advance interest payment" />
+                  </div>
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleDeposit} disabled={depositMutation.isPending || !amount || !accountId}>
+                    {depositMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm Deposit
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h4 className="text-lg font-semibold mb-3">Transaction Ledger</h4>
+        {!transactions?.length ? (
+          <EmptyState icon={Wallet} title="No wallet transactions" />
+        ) : (
+          <div className="space-y-2">
+            {transactions.map(tx => (
+              <Card key={tx.id} className="hover:shadow-sm transition-shadow">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-full ${tx.type === 'DEPOSIT' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                      {tx.type === 'DEPOSIT' ? <ArrowDownRight className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                    </div>
+                    <div>
+                      <p className="font-medium">{tx.type === 'DEPOSIT' ? 'Deposit' : 'Withdrawal'}</p>
+                      <p className="text-xs text-muted-foreground"><DateDisplay dateString={tx.transaction_date} /> {tx.notes ? `• ${tx.notes}` : ''}</p>
+                    </div>
+                  </div>
+                  <div className={`font-semibold ${tx.type === 'DEPOSIT' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
+                    {tx.type === 'DEPOSIT' ? '+' : '-'}<CurrencyDisplay amount={tx.amount} className="inline" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CustomerDetailPage() {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
@@ -182,7 +362,7 @@ export default function CustomerDetailPage() {
             <CardContent className="pt-10 pb-6 flex flex-col items-center text-center space-y-4">
               <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
                 {customer.image_url && (
-                  <AvatarImage src={`http://localhost:8080/api/images/${customer.cust_id}/PROFILE.${customer.image_url.split('.').pop()}`} className="object-cover" />
+                  <AuthAvatarImage src={`/api/images/${customer.cust_id}/PROFILE.${customer.image_url.split('.').pop()}`} className="object-cover" />
                 )}
                 <AvatarFallback className="text-3xl bg-primary/10 text-primary">{initials}</AvatarFallback>
               </Avatar>
@@ -191,19 +371,19 @@ export default function CustomerDetailPage() {
                 <p className="text-sm text-muted-foreground font-mono">ID: {customer.cust_id}</p>
                 <div className="pt-2"><StatusBadge status={customer.status} /></div>
               </div>
-              
+
               <Separator className="w-full my-4" />
-              
+
               <div className="w-full space-y-2">
-                <Button 
-                  className="w-full gap-2" 
+                <Button
+                  className="w-full gap-2"
                   variant="default"
                   onClick={() => navigate(`/create-pledge?customerId=${customer.cust_id}`)}
                 >
                   <Package className="h-4 w-4" /> New Pledge
                 </Button>
-                <Button 
-                  className="w-full gap-2" 
+                <Button
+                  className="w-full gap-2"
                   variant="outline"
                   onClick={() => navigate(`/customers/edit/${customer.cust_id}`)}
                 >
@@ -225,8 +405,9 @@ export default function CustomerDetailPage() {
               <TabsTrigger value="relatives" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 py-3"><UsersIcon className="h-4 w-4 mr-2" /> Relatives</TabsTrigger>
               <TabsTrigger value="items" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 py-3"><Package className="h-4 w-4 mr-2" /> Items</TabsTrigger>
               <TabsTrigger value="bills" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 py-3"><FileText className="h-4 w-4 mr-2" /> Bills</TabsTrigger>
+              <TabsTrigger value="wallet" className="rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent px-2 py-3"><Wallet className="h-4 w-4 mr-2" /> Wallet</TabsTrigger>
             </TabsList>
-            
+
             <div className="pt-6">
               <TabsContent value="info" className="m-0 focus-visible:outline-none">
                 <Card className="border-border/50 shadow-sm"><CardHeader><CardTitle>Personal Information</CardTitle></CardHeader><CardContent><PersonalInfoTab customer={customer} /></CardContent></Card>
@@ -241,7 +422,7 @@ export default function CustomerDetailPage() {
                         <CardContent className="p-0">
                           {proof.image_url && (
                             <div className="aspect-video w-full bg-muted overflow-hidden relative">
-                              <img src={`http://localhost:8080/api/images/${customer.cust_id}/${proof.id_type}.${proof.image_url.split('.').pop()}`} alt={proof.id_type} className="object-cover w-full h-full" />
+                              <AuthImage src={`/api/images/${customer.cust_id}/${proof.id_type}.${proof.image_url.split('.').pop()}`} alt={proof.id_type} className="object-cover w-full h-full" />
                             </div>
                           )}
                           <div className="p-4 space-y-1">
@@ -257,6 +438,7 @@ export default function CustomerDetailPage() {
               <TabsContent value="relatives" className="m-0 focus-visible:outline-none"><RelativesTab customerId={customer.cust_id} relatives={customer.relatives} /></TabsContent>
               <TabsContent value="items" className="m-0 focus-visible:outline-none"><ItemsSection customerId={customer.cust_id} /></TabsContent>
               <TabsContent value="bills" className="m-0 focus-visible:outline-none"><BillsSection customerId={customer.cust_id} /></TabsContent>
+              <TabsContent value="wallet" className="m-0 focus-visible:outline-none"><WalletSection customerId={customer.cust_id} /></TabsContent>
             </div>
           </Tabs>
         </div>

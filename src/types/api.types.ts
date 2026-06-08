@@ -1,12 +1,14 @@
 import {
   AccountType,
   BillItemAction,
+  BillStatus,
   BillType,
   Gender,
   ItemStatus,
   MaritalStatus,
   PaymentDirection,
   TransactionType,
+  WalletTransactionType,
 } from "./enums";
 
 // --- Auth ---
@@ -138,6 +140,40 @@ export interface TransactionDto {
   reference_id: string;
 }
 
+// --- Wallet ---
+export interface CustomerWalletDto {
+  id: number;
+  cust_id: number;
+  balance: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WalletTransactionDto {
+  id: number;
+  wallet_id: number;
+  amount: number;
+  type: WalletTransactionType;
+  transaction_date: string;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface WalletDepositRequest {
+  amount: number;
+  notes?: string;
+  accounts: PledgeAccountRequest[];
+}
+
+export interface WalletAllocationDto {
+  id: number;
+  deposit_transaction_id: number;
+  amount_used: number;
+  allocation_type: 'PRINCIPAL' | 'INTEREST';
+  deposit_date: string;
+  deposit_notes: string | null;
+}
+
 // --- Ornament ---
 export interface OrnamentDto {
   id: number;
@@ -214,10 +250,13 @@ export interface BillDto {
   interest_accumulated: number;
   bill_date: string;
   notes: string;
+  status: BillStatus;
   created_by: string;
   created_at: string;
   items: BillItemDto[];
   accounts: BillAccountDto[];
+  wallet_allocations?: WalletAllocationDto[];
+  wallet_amount_used?: number;
 }
 
 export interface PledgeItemRequest {
@@ -250,6 +289,7 @@ export interface RedeemBillRequest {
   item_ids: number[];
   notes: string;
   bill_date: string;
+  wallet_amount_used?: number;
   accounts: PledgeAccountRequest[];
 }
 

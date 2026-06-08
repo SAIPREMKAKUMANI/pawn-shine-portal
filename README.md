@@ -1,73 +1,112 @@
-# Welcome to your Lovable project
+# Pawn Shine Portal — Frontend
 
-## Project info
+Professional gold pawn broking management system for tracking customers, bills, ornaments, and interest calculations.
 
-**URL**: https://lovable.dev/projects/54be6a1e-1479-4596-a8f8-38cb51abde10
+## Tech Stack
 
-## How can I edit this code?
+- **React 18** + **TypeScript** — UI framework
+- **Vite 5** — Build tool with React SWC plugin for fast HMR
+- **Tailwind CSS** + **shadcn/ui** — Styling and component library
+- **React Query** — Server state management
+- **Axios** — HTTP client with auth interceptors
+- **React Router v6** — Client-side routing
+- **Zod** — Schema validation
+- **Zustand** — Client state management
 
-There are several ways of editing your application.
+## Local Development
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/54be6a1e-1479-4596-a8f8-38cb51abde10) and start prompting.
+- [Node.js](https://nodejs.org/) 20+ and npm
 
-Changes made via Lovable will be committed automatically to this repo.
+### Setup
 
-**Use your preferred IDE**
+```bash
+# 1. Clone the repository
+git clone https://github.com/SAIPREMKAKUMANI/pawn-shine-portal.git
+cd pawn-shine-portal
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+# 2. Install dependencies
+npm install
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+# 3. Create environment file
+cp .env.example .env
+# Edit .env with your backend URL
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 4. Start the dev server (http://localhost:8081)
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_BACKEND_URL` | `http://localhost:8080` | Backend API server URL for the Vite dev proxy |
 
-**Use GitHub Codespaces**
+### Available Scripts
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start dev server with HMR on port 8081 |
+| `npm run build` | Production build to `dist/` |
+| `npm run build:dev` | Development build (unminified) |
+| `npm run lint` | Run ESLint |
+| `npm run preview` | Preview production build locally |
 
-## What technologies are used for this project?
+## Production Deployment (Oracle Cloud)
 
-This project is built with:
+The app is deployed on Oracle Cloud using a **two-instance architecture**:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```
+┌─────────────────────┐        ┌─────────────────────┐
+│   PUBLIC INSTANCE    │        │  PRIVATE INSTANCE    │
+│   (Public Subnet)    │  VCN   │  (Private Subnet)    │
+│                      │◄──────►│                      │
+│  Nginx (port 80)     │        │  Spring Boot (:8080) │
+│  - Serves static UI  │        │  PostgreSQL (:5432)  │
+│  - Proxies /api/*    │        │                      │
+└─────────────────────┘        └─────────────────────┘
+```
 
-## How can I deploy this project?
+### Deployment Files
 
-Simply open [Lovable](https://lovable.dev/projects/54be6a1e-1479-4596-a8f8-38cb51abde10) and click on Share -> Publish.
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Multi-stage build: Node → Nginx |
+| `nginx.conf` | Simple Nginx config (single-VM Docker Compose) |
+| `nginx-public.conf` | Production Nginx config (two-instance, envsubst templating) |
+| `docker-compose.public.yml` | Compose file for the public instance |
+| `setup-public.sh` | One-time VM setup script |
+| `update.sh` | Pull & redeploy script |
 
-## Can I connect a custom domain to my Lovable project?
+### First-Time Setup
 
-Yes, you can!
+```bash
+# On the public VM
+curl -sL https://raw.githubusercontent.com/SAIPREMKAKUMANI/pawn-shine-portal/main/setup-public.sh | bash
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Update & Redeploy
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+cd ~/pawn-deploy && bash update.sh
+```
+
+## Project Structure
+
+```
+pawn-shine-portal/
+├── src/
+│   ├── components/     # Reusable UI components
+│   │   ├── shared/     # Shared components (status badges, etc.)
+│   │   └── ui/         # shadcn/ui primitives
+│   ├── hooks/          # Custom React hooks
+│   ├── lib/            # Utilities (API client, helpers)
+│   ├── pages/          # Page-level components
+│   ├── services/       # API service functions
+│   ├── types/          # TypeScript types and enums
+│   └── validators/     # Zod validation schemas
+├── public/             # Static assets
+├── docs/               # API documentation
+└── dist/               # Production build output
+```

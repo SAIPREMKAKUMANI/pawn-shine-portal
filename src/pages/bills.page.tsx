@@ -11,7 +11,7 @@ import { DateDisplay } from "@/components/shared/date-display";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { useBillsList, useBillsByType, useBillDetail } from "@/hooks/use-bills.hook";
 import { BillType, PaymentDirection } from "@/types/enums";
-import { FileText, Search, Printer, ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { FileText, Search, Printer, ArrowDownRight, ArrowUpRight, Wallet } from "lucide-react";
 
 function BillDetailDialog({ open, onOpenChange, billId }: { open: boolean, onOpenChange: (open: boolean) => void, billId: number | null }) {
   const { data: bill, isLoading } = useBillDetail(billId);
@@ -62,21 +62,67 @@ function BillDetailDialog({ open, onOpenChange, billId }: { open: boolean, onOpe
               </table>
             </div>
 
-            <div>
-              <h3 className="font-semibold border-b pb-2 mb-3">Payment Accounts</h3>
-              <table className="w-full text-sm">
-                <thead><tr className="text-muted-foreground text-left"><th className="pb-2">Account ID</th><th className="pb-2">Direction</th><th className="pb-2 text-right">Amount</th></tr></thead>
-                <tbody>
-                  {bill.accounts.map((acc, i) => (
-                    <tr key={i} className="border-b last:border-0"><td className="py-2">{acc.account_id}</td><td className="py-2">{acc.direction === PaymentDirection.IN ? <span className="text-emerald-600 flex items-center gap-1"><ArrowDownRight className="h-3 w-3"/> IN</span> : <span className="text-red-600 flex items-center gap-1"><ArrowUpRight className="h-3 w-3"/> OUT</span>}</td><td className="py-2 text-right"><CurrencyDisplay amount={acc.amount} /></td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* Wallet Usage Breakdown */}
+            {bill.wallet_allocations && bill.wallet_allocations.length > 0 && (
+              <div>
+                <h3 className="font-semibold border-b pb-2 mb-3 flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-emerald-600" />
+                  Wallet Usage Breakdown
+                </h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-muted-foreground text-left">
+                      <th className="pb-2">Deposit Date</th>
+                      <th className="pb-2">Type</th>
+                      <th className="pb-2 text-right">Amount Used</th>
+                      <th className="pb-2">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bill.wallet_allocations.map((alloc, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="py-2"><DateDisplay dateString={alloc.deposit_date} /></td>
+                        <td className="py-2">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            alloc.allocation_type === 'PRINCIPAL' 
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                          }`}>
+                            {alloc.allocation_type}
+                          </span>
+                        </td>
+                        <td className="py-2 text-right"><CurrencyDisplay amount={alloc.amount_used} /></td>
+                        <td className="py-2 text-muted-foreground text-xs">{alloc.deposit_notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex justify-end mt-2 text-sm">
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    Total from Wallet: <CurrencyDisplay amount={bill.wallet_amount_used ?? 0} />
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Accounts */}
+            {bill.accounts && bill.accounts.length > 0 && (
+              <div>
+                <h3 className="font-semibold border-b pb-2 mb-3">Payment Accounts</h3>
+                <table className="w-full text-sm">
+                  <thead><tr className="text-muted-foreground text-left"><th className="pb-2">Account ID</th><th className="pb-2">Direction</th><th className="pb-2 text-right">Amount</th></tr></thead>
+                  <tbody>
+                    {bill.accounts.map((acc, i) => (
+                      <tr key={i} className="border-b last:border-0"><td className="py-2">{acc.account_id}</td><td className="py-2">{acc.direction === PaymentDirection.IN ? <span className="text-emerald-600 flex items-center gap-1"><ArrowDownRight className="h-3 w-3"/> IN</span> : <span className="text-red-600 flex items-center gap-1"><ArrowUpRight className="h-3 w-3"/> OUT</span>}</td><td className="py-2 text-right"><CurrencyDisplay amount={acc.amount} /></td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div className="bg-muted/30 p-4 rounded-lg flex justify-between items-center mt-6">
-              <span className="font-semibold">Total Amount {bill.bill_type === "CREDIT" ? "Lended" : "Paid"}:</span>
-              <CurrencyDisplay amount={bill.bill_type === "CREDIT" ? bill.total_amount_lended : bill.amount_paid} className="text-xl font-bold text-primary" />
+              <span className="font-semibold">Total Amount {bill.bill_type === BillType.REDEEM ? "Paid" : "Lended"}:</span>
+              <CurrencyDisplay amount={bill.bill_type === BillType.REDEEM ? bill.amount_paid : bill.total_amount_lended} className="text-xl font-bold text-primary" />
             </div>
 
             {bill.notes && (
@@ -116,8 +162,8 @@ function BillsTable({ bills }: { bills: NonNullable<ReturnType<typeof useBillsLi
                 <td className="p-3 font-medium">{bill.bill_id}</td>
                 <td className="p-3"><DateDisplay dateString={bill.bill_date} /></td>
                 <td className="p-3">{bill.customer_name}</td>
-                <td className="p-3"><StatusBadge status={bill.bill_type === "CREDIT" ? "PLEDGE" : "REDEEM"} /></td>
-                <td className="p-3 text-right font-semibold"><CurrencyDisplay amount={bill.bill_type === "CREDIT" ? bill.total_amount_lended : bill.amount_paid} /></td>
+                <td className="p-3"><StatusBadge status={bill.bill_type} /></td>
+                <td className="p-3 text-right font-semibold"><CurrencyDisplay amount={bill.bill_type === BillType.REDEEM ? bill.amount_paid : bill.total_amount_lended} /></td>
               </tr>
             ))}
           </tbody>
@@ -149,7 +195,7 @@ function AllBills() {
 }
 
 function TypedBills({ type }: { type: BillType }) {
-  const { data: page, isLoading } = useBillsByType(type, 0, 50);
+  const { data: page, isLoading } = useBillsByType(type, 0, 10);
   if (isLoading) return <LoadingSpinner message="Loading bills..." />;
   return <div className="mt-4"><BillsTable bills={page?.content ?? []} /></div>;
 }
@@ -167,12 +213,12 @@ export default function BillsPage() {
           <Tabs defaultValue="ALL">
             <TabsList className="mb-4">
               <TabsTrigger value="ALL">All Bills</TabsTrigger>
-              <TabsTrigger value={BillType.CREDIT}>Pledges (Credit)</TabsTrigger>
-              <TabsTrigger value={BillType.DEBIT}>Redemptions (Debit)</TabsTrigger>
+              <TabsTrigger value={BillType.PLEDGE}>Pledges</TabsTrigger>
+              <TabsTrigger value={BillType.REDEEM}>Redemptions</TabsTrigger>
             </TabsList>
             <TabsContent value="ALL"><AllBills /></TabsContent>
-            <TabsContent value={BillType.CREDIT}><TypedBills type={BillType.CREDIT} /></TabsContent>
-            <TabsContent value={BillType.DEBIT}><TypedBills type={BillType.DEBIT} /></TabsContent>
+            <TabsContent value={BillType.PLEDGE}><TypedBills type={BillType.PLEDGE} /></TabsContent>
+            <TabsContent value={BillType.REDEEM}><TypedBills type={BillType.REDEEM} /></TabsContent>
           </Tabs>
         </CardContent>
       </Card>

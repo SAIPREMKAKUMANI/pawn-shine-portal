@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,26 +16,39 @@ import { useRedeemBill } from "@/hooks/use-bills.hook";
 import { redeemBillSchema, type RedeemBillFormValues } from "@/validators/redeem-bill.schema";
 import { formatDateForApi } from "@/utils/format-date";
 import { formatCurrency } from "@/utils/format-currency";
-import { Plus, Trash2, Loader2, IndianRupee } from "lucide-react";
+import { Plus, Trash2, Loader2, IndianRupee, CheckCircle2, Wallet, ArrowDownRight, ShieldCheck } from "lucide-react";
+import { useCustomerWallet, useWalletTransactions } from "@/hooks/use-wallet.hook";
+import { DateDisplay } from "@/components/shared/date-display";
 
 export default function RedeemItemsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: customers } = useCustomersList();
   const { data: accounts } = useAccountsList();
   const redeemMutation = useRedeemBill();
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  // Read query params for auto-selection
+  const preselectedCustomerId = searchParams.get("customerId") ? parseInt(searchParams.get("customerId")!) : null;
+  const preselectedItemId = searchParams.get("itemId") ? parseInt(searchParams.get("itemId")!) : null;
+
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(preselectedCustomerId);
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
   const { data: activeItems, isLoading: isLoadingItems } = useActiveCustomerItems(selectedCustomerId);
+  
+  const { data: wallet } = useCustomerWallet(selectedCustomerId);
+  const { data: walletTx } = useWalletTransactions(selectedCustomerId);
+  const depositTransactions = useMemo(() => walletTx?.filter(tx => tx.type === 'DEPOSIT') ?? [], [walletTx]);
 
   const activeAccounts = accounts?.filter(a => a.is_active) ?? [];
 
   const form = useForm<RedeemBillFormValues>({
     resolver: zodResolver(redeemBillSchema),
     defaultValues: {
-      cust_id: 0,
+      cust_id: preselectedCustomerId ?? 0,
       notes: "",
       bill_date: formatDateForApi(new Date()),
       item_ids: [],
+      wallet_amount_used: 0,
       accounts: [{ account_id: 0, amount: 0 }],
     },
   });
@@ -45,22 +58,58 @@ export default function RedeemItemsPage() {
   const watchItemIds = form.watch("item_ids");
   const watchAccounts = form.watch("accounts");
 
-  const totalOutstandingToPay = useMemo(() => {
-    if (!activeItems) return 0;
-    return watchItemIds.reduce((sum, itemId) => {
-      const item = activeItems.find(i => i.id === itemId);
-      return sum + (item?.outstanding_balance || 0);
-    }, 0);
+  // Auto-select customer from URL params
+  useEffect(() => {
+    if (preselectedCustomerId && !hasAutoSelected) {
+      setSelectedCustomerId(preselectedCustomerId);
+      form.setValue("cust_id", preselectedCustomerId);
+    }
+  }, [preselectedCustomerId, hasAutoSelected, form]);
+
+  // Auto-select item from URL params once items are loaded
+  useEffect(() => {
+    if (preselectedItemId && activeItems && !hasAutoSelected) {
+      const itemExists = activeItems.some(i => i.id === preselectedItemId);
+      if (itemExists) {
+        form.setValue("item_ids", [preselectedItemId], { shouldValidate: true });
+        setHasAutoSelected(true);
+      }
+    }
+  }, [preselectedItemId, activeItems, hasAutoSelected, form]);
+
+  // --- Auto-calculate wallet allocation ---
+  const selectedItems = useMemo(() => {
+    if (!activeItems) return [];
+    return watchItemIds.map(id => activeItems.find(i => i.id === id)).filter(Boolean) as NonNullable<typeof activeItems>[number][];
   }, [watchItemIds, activeItems]);
 
+  const totalPrincipal = useMemo(() => selectedItems.reduce((sum, item) => sum + item.amount_lended, 0), [selectedItems]);
+  const totalInterest = useMemo(() => selectedItems.reduce((sum, item) => sum + item.compound_interest, 0), [selectedItems]);
+  const totalOutstandingToPay = totalPrincipal + totalInterest;
+
+  const walletBalance = wallet?.balance ?? 0;
+
+  // Wallet covers principal first, then interest
+  const walletForPrincipal = Math.min(walletBalance, totalPrincipal);
+  const walletForInterest = Math.min(walletBalance - walletForPrincipal, totalInterest);
+  const totalWalletUsed = walletForPrincipal + walletForInterest;
+  const remainingToPay = Math.max(0, totalOutstandingToPay - totalWalletUsed);
+  const walletCoversAll = remainingToPay <= 0 && totalOutstandingToPay > 0;
+
+  // Auto-set wallet_amount_used on the form whenever selection changes
+  useEffect(() => {
+    form.setValue("wallet_amount_used", totalWalletUsed);
+  }, [totalWalletUsed, form]);
+
   const totalAccountsAmount = useMemo(() => watchAccounts.reduce((sum, acc) => sum + (Number(acc.amount) || 0), 0), [watchAccounts]);
-  const amountDiff = totalOutstandingToPay - totalAccountsAmount;
+  const amountDiff = remainingToPay - totalAccountsAmount;
 
   function handleCustomerSelect(custIdStr: string) {
     const custId = parseInt(custIdStr);
     setSelectedCustomerId(custId);
     form.setValue("cust_id", custId);
     form.setValue("item_ids", []); // Reset items when customer changes
+    setHasAutoSelected(false);
   }
 
   function handleItemToggle(itemId: number, checked: boolean) {
@@ -77,11 +126,23 @@ export default function RedeemItemsPage() {
       form.setError("cust_id", { message: "Select a customer" });
       return;
     }
-    if (values.accounts.some(a => a.account_id === 0)) {
+    
+    // Filter out accounts with 0 amount to avoid backend errors
+    const validAccounts = values.accounts.filter(a => a.amount > 0 && a.account_id > 0);
+    
+    // If wallet covers all, send empty accounts
+    const finalValues = {
+      ...values,
+      wallet_amount_used: totalWalletUsed,
+      accounts: walletCoversAll ? [] : validAccounts,
+    };
+    
+    if (!walletCoversAll && validAccounts.some(a => a.account_id === 0)) {
       form.setError("accounts.0.account_id", { message: "Select an account" });
       return;
     }
-    redeemMutation.mutate(values, {
+    
+    redeemMutation.mutate(finalValues, {
       onSuccess: () => navigate("/bills"),
     });
   }
@@ -129,24 +190,68 @@ export default function RedeemItemsPage() {
                     <FormField control={form.control} name="item_ids" render={() => (
                       <FormItem>
                         <div className="mb-4"><FormLabel className="text-base">Pledged Items</FormLabel><FormMessage /></div>
-                        {activeItems.map(item => (
-                          <div key={item.id} className="flex items-center space-x-3 space-y-0 p-4 border rounded-lg hover:bg-muted/30 transition-colors">
-                            <Checkbox 
-                              checked={watchItemIds.includes(item.id)} 
-                              onCheckedChange={(checked) => handleItemToggle(item.id, checked as boolean)} 
-                            />
-                            <div className="flex-1 flex justify-between items-center">
-                              <div>
-                                <p className="font-medium leading-none">{item.description}</p>
-                                <p className="text-sm text-muted-foreground mt-1">Lended: {formatCurrency(item.amount_lended)} • Int: {formatCurrency(item.compound_interest)}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm text-muted-foreground">Total Due</p>
-                                <p className="font-bold text-primary">{formatCurrency(item.outstanding_balance)}</p>
+                        {activeItems.map(item => {
+                          const isSelected = watchItemIds.includes(item.id);
+                          const hasPaidAmount = item.paid_amount > 0;
+                          const paidPercentage = item.paid_amount > 0 
+                            ? Math.min(100, (item.paid_amount / (item.amount_lended + item.compound_interest)) * 100) 
+                            : 0;
+
+                          return (
+                            <div 
+                              key={item.id} 
+                              className={`relative overflow-hidden p-4 border rounded-lg transition-all duration-200 ${
+                                isSelected 
+                                  ? "border-primary bg-primary/5 shadow-sm" 
+                                  : hasPaidAmount 
+                                    ? "border-emerald-300 bg-emerald-50/30 hover:bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-950/20" 
+                                    : "hover:bg-muted/30"
+                              }`}
+                            >
+                              {/* Paid progress bar at bottom */}
+                              {hasPaidAmount && (
+                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted/30">
+                                  <div 
+                                    className="h-full bg-emerald-500 transition-all duration-500" 
+                                    style={{ width: `${paidPercentage}%` }} 
+                                  />
+                                </div>
+                              )}
+
+                              <div className="flex items-center space-x-3">
+                                <Checkbox 
+                                  checked={isSelected} 
+                                  onCheckedChange={(checked) => handleItemToggle(item.id, checked as boolean)} 
+                                />
+                                <div className="flex-1 flex justify-between items-center">
+                                  <div>
+                                    <p className="font-medium leading-none">{item.description}</p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      Lended: {formatCurrency(item.amount_lended)} • Int: {formatCurrency(item.compound_interest)}
+                                    </p>
+                                    {hasPaidAmount && (
+                                      <p className="text-sm mt-1 flex items-center gap-1">
+                                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                        <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                                          Paid: {formatCurrency(item.paid_amount)}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          ({paidPercentage.toFixed(0)}%)
+                                        </span>
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm text-muted-foreground">
+                                      {hasPaidAmount ? "Remaining Due" : "Total Due"}
+                                    </p>
+                                    <p className="font-bold text-primary text-lg">{formatCurrency(item.outstanding_balance)}</p>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </FormItem>
                     )} />
                     <div className="flex justify-end p-3 bg-muted/50 rounded-lg">
@@ -161,42 +266,164 @@ export default function RedeemItemsPage() {
           {watchItemIds.length > 0 && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>3. Receive Payment</CardTitle>
-                <Button type="button" variant="outline" size="sm" onClick={() => accountFields.append({ account_id: 0, amount: 0 })}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Account
-                </Button>
+                <CardTitle>3. Payment Summary</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {accountFields.fields.map((accField, index) => (
-                  <div key={accField.id} className="flex gap-4 items-end">
-                    <FormField control={form.control} name={`accounts.${index}.account_id`} render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Deposit To</FormLabel>
-                        <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value ? field.value.toString() : ""}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            {activeAccounts.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.bank_name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name={`accounts.${index}.amount`} render={({ field }) => (
-                      <FormItem className="flex-1"><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    {index > 0 && <Button type="button" variant="ghost" size="icon" className="mb-2" onClick={() => accountFields.remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
-                  </div>
-                ))}
+              <CardContent className="space-y-6">
                 
+                {/* Wallet Coverage Section */}
+                {walletBalance > 0 && (
+                  <div className={`rounded-lg p-4 space-y-3 border ${
+                    walletCoversAll 
+                      ? "bg-emerald-500/10 border-emerald-500/30" 
+                      : "bg-emerald-500/5 border-emerald-500/20"
+                  }`}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400 font-medium">
+                        <Wallet className="h-5 w-5" />
+                        Wallet Balance: {formatCurrency(walletBalance)}
+                      </div>
+                      {walletCoversAll && (
+                        <div className="flex items-center gap-1.5 bg-emerald-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          Fully Covered
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Wallet allocation breakdown */}
+                    {totalWalletUsed > 0 && (
+                      <div className="bg-white/50 dark:bg-black/20 rounded-md p-3 space-y-2">
+                        <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-400">Wallet Auto-Allocation</p>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Principal Coverage</span>
+                            <span className="font-medium">
+                              {formatCurrency(walletForPrincipal)} <span className="text-xs text-muted-foreground">/ {formatCurrency(totalPrincipal)}</span>
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                              style={{ width: `${totalPrincipal > 0 ? (walletForPrincipal / totalPrincipal) * 100 : 0}%` }}
+                            />
+                          </div>
+                          
+                          {totalInterest > 0 && (
+                            <>
+                              <div className="flex justify-between items-center text-sm mt-1">
+                                <span className="text-muted-foreground">Interest Coverage</span>
+                                <span className="font-medium">
+                                  {formatCurrency(walletForInterest)} <span className="text-xs text-muted-foreground">/ {formatCurrency(totalInterest)}</span>
+                                </span>
+                              </div>
+                              <div className="w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                                  style={{ width: `${totalInterest > 0 ? (walletForInterest / totalInterest) * 100 : 0}%` }}
+                                />
+                              </div>
+                            </>
+                          )}
+                          
+                          <div className="flex justify-between items-center text-sm font-semibold pt-2 border-t border-emerald-500/20 mt-2">
+                            <span>Total from Wallet</span>
+                            <span className="text-emerald-700 dark:text-emerald-300">{formatCurrency(totalWalletUsed)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Deposit history for reference */}
+                    {depositTransactions.length > 0 && (
+                      <div className="bg-white/50 dark:bg-black/20 rounded-md p-3">
+                        <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 mb-2">Deposit History (For Interest Calculation)</p>
+                        <div className="max-h-[120px] overflow-y-auto space-y-1.5 pr-2">
+                          {depositTransactions.map(tx => (
+                            <div key={tx.id} className="flex justify-between items-center text-xs">
+                              <span className="flex items-center gap-1.5">
+                                <ArrowDownRight className="h-3 w-3 text-emerald-500" />
+                                <DateDisplay dateString={tx.transaction_date} />
+                              </span>
+                              <span className="font-medium text-emerald-700 dark:text-emerald-300">
+                                {formatCurrency(tx.amount)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Remaining amount notice */}
+                {remainingToPay > 0 && (
+                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                      Remaining to pay via Cash/Bank: {formatCurrency(remainingToPay)}
+                    </p>
+                  </div>
+                )}
+
+                {/* Cash/Bank Accounts Section — only shown when wallet doesn't cover everything */}
+                {!walletCoversAll && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-sm">Cash/Bank Payments</p>
+                      <Button type="button" variant="outline" size="sm" onClick={() => accountFields.append({ account_id: 0, amount: 0 })}>
+                        <Plus className="h-4 w-4 mr-1" /> Add Account
+                      </Button>
+                    </div>
+                    {accountFields.fields.map((accField, index) => (
+                      <div key={accField.id} className="flex gap-4 items-end">
+                      <FormField control={form.control} name={`accounts.${index}.account_id`} render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Deposit To</FormLabel>
+                          <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value ? field.value.toString() : ""}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              {activeAccounts.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.bank_name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name={`accounts.${index}.amount`} render={({ field }) => (
+                        <FormItem className="flex-1"><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      {index > 0 && <Button type="button" variant="ghost" size="icon" className="mb-2" onClick={() => accountFields.remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+                    </div>
+                  ))}
+                  </div>
+                )}
+
                 <FormField control={form.control} name="notes" render={({ field }) => (
                   <FormItem className="mt-4"><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea placeholder="e.g. Paid in full via cash" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
 
-                <div className={`flex justify-end p-2 rounded-lg font-semibold ${amountDiff !== 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                  <span>Collected: {formatCurrency(totalAccountsAmount)}</span>
-                  <span className="mx-2">|</span>
-                  <span>Diff: {formatCurrency(Math.abs(amountDiff))}</span>
-                </div>
+                {/* Payment summary */}
+                {walletCoversAll ? (
+                  <div className="flex justify-end p-3 rounded-lg font-semibold text-lg items-center gap-4 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+                    <div className="flex flex-col text-right text-sm font-normal">
+                      <span>From Wallet: {formatCurrency(totalWalletUsed)}</span>
+                    </div>
+                    <div className="h-8 w-px bg-current opacity-20 mx-1"></div>
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="h-5 w-5" />
+                      <span>Fully Covered</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`flex justify-end p-3 rounded-lg font-semibold text-lg items-center gap-4 ${amountDiff !== 0 ? 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400'}`}>
+                    <div className="flex flex-col text-right text-sm font-normal">
+                      {totalWalletUsed > 0 && <span>From Wallet: {formatCurrency(totalWalletUsed)}</span>}
+                      <span>From Accounts: {formatCurrency(totalAccountsAmount)}</span>
+                    </div>
+                    <div className="h-8 w-px bg-current opacity-20 mx-1"></div>
+                    <div className="text-right">
+                      <span>Diff: {formatCurrency(Math.abs(amountDiff))}</span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

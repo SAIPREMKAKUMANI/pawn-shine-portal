@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Gender, MaritalStatus } from "@/types/enums";
 
 const contactSchema = z.object({
+  contact_id: z.number().optional(),
   phone: z.string().min(10, "Phone must be at least 10 digits"),
   secondary_phone: z.string().optional(),
   whatsapp_phone: z.string().optional(),
@@ -9,6 +10,7 @@ const contactSchema = z.object({
 });
 
 const addressSchema = z.object({
+  address_id: z.number().optional(),
   street: z.string().min(1, "Street is required"),
   city: z.string().min(1, "City is required"),
   state: z.string().min(1, "State is required"),
@@ -17,12 +19,14 @@ const addressSchema = z.object({
 });
 
 const idProofSchema = z.object({
+  id_proof_id: z.number().optional(),
   id_type: z.string().min(1, "ID type is required"),
   id_number: z.string().min(1, "ID number is required"),
   image: z.any().optional(),
 });
 
 const relativeSchema = z.object({
+  relative_id: z.number().optional(),
   name: z.string().min(1, "Relative name is required"),
   relationship: z.string().min(1, "Relationship is required"),
   contact_number: z.string().min(10, "Contact number is required"),
