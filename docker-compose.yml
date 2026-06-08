@@ -22,15 +22,15 @@ services:
     ports:
       - "80:80"
     environment:
-      - BACKEND_PRIVATE_IP=${BACKEND_PRIVATE_IP:-10.0.1.29}
+      - BACKEND_PRIVATE_IP=${BACKEND_PRIVATE_IP}
     volumes:
-      - ./pawn-frontend/nginx-public.conf:/etc/nginx/templates/default.conf.template:ro
+      - ./pawn-frontend/nginx-ui.conf:/etc/nginx/templates/default.conf.template:ro
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 512M`
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1" ]
       interval: 30s
       timeout: 5s
       retries: 3
