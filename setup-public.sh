@@ -75,7 +75,7 @@ fi
 # now live in the frontend repo — single source of truth.
 # -----------------------------------------------------------
 echo "[6/6] Setting up configuration files..."
-cp "$DEPLOY_DIR/pawn-frontend/docker-compose.public.yml" "$DEPLOY_DIR/docker-compose.yml"
+cp "$DEPLOY_DIR/pawn-frontend/docker-compose.yml" "$DEPLOY_DIR/docker-compose.yml"
 
 # Create .env with backend IP
 if [ ! -f "$DEPLOY_DIR/.env" ]; then
@@ -110,10 +110,7 @@ sudo bash -c "cat > /etc/motd << 'MOTD'
     ║     cd ~/pawn-deploy && docker compose up -d --build      ║
     ║                                                           ║
     ║  3. Check status:                                         ║
-    ║     docker compose ps                                     ║
-    ║                                                           ║
-    ║  4. SSH to private instance:                              ║
-    ║     ssh ubuntu@10.0.1.29                                  ║
+    ║     docker compose ps     `                                 ║
     ║                                                           ║
     ╚═══════════════════════════════════════════════════════════╝
 
