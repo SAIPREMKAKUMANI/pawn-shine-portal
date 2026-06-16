@@ -29,7 +29,7 @@ echo "============================================================"
 # -----------------------------------------------------------
 # 1. Update and Upgrade System Packages
 # -----------------------------------------------------------
-echo "[1/6] Updating and upgrading system packages..."
+echo "[1/7] Updating and upgrading system packages..."
 sudo apt-get update && sudo apt-get upgrade -y
 
 # -----------------------------------------------------------
@@ -39,13 +39,13 @@ sudo apt-get update && sudo apt-get upgrade -y
 # No "works on my machine" issues. Nginx config, Node build,
 # and all dependencies are baked into the image.
 # -----------------------------------------------------------
-echo "[2/6] Installing Docker and utilities..."
+echo "[2/7] Installing Docker and utilities..."
 sudo apt-get install -y docker.io docker-compose-v2 git curl wget unzip iptables-persistent netfilter-persistent
 
 # -----------------------------------------------------------
 # 3. Enable Docker and add user to docker group
 # -----------------------------------------------------------
-echo "[3/6] Enabling Docker service..."
+echo "[3/7] Enabling Docker service..."
 sudo systemctl enable docker
 sudo systemctl start docker
 sudo usermod -aG docker ubuntu
@@ -57,11 +57,11 @@ sudo usermod -aG docker ubuntu
 # backend source code. Smaller attack surface, faster clones,
 # and cleaner separation of concerns.
 # -----------------------------------------------------------
-echo "[4/6] Creating deployment directory..."
+echo "[4/7] Creating deployment directory..."
 mkdir -p "$DEPLOY_DIR"
 cd "$DEPLOY_DIR"
 
-echo "[5/6] Cloning frontend repository (Branch: $DEPLOY_BRANCH)..."
+echo "[5/7] Cloning frontend repository (Branch: $DEPLOY_BRANCH)..."
 if [ ! -d "pawn-frontend" ]; then
     git clone -b "$DEPLOY_BRANCH" https://github.com/SAIPREMKAKUMANI/pawn-shine-portal.git pawn-frontend
 else
@@ -69,12 +69,19 @@ else
 fi
 
 # -----------------------------------------------------------
-# 6. Copy configuration files
+echo "[6/7] Allowing HTTP traffic..."
+# Allow HTTP traffic in iptables
+sudo iptables -I INPUT 6 -p tcp --dport 80 -j ACCEPT
+# Save the firewall rules so they persist after reboot
+sudo netfilter-persistent save
+
+# -----------------------------------------------------------
+# 7. Copy configuration files
 #
 # All UI configs (docker-compose.public.yml, nginx-public.conf)
 # now live in the frontend repo — single source of truth.
 # -----------------------------------------------------------
-echo "[6/6] Setting up configuration files..."
+echo "[7/7] Setting up configuration files..."
 cp "$DEPLOY_DIR/pawn-frontend/docker-compose.yml" "$DEPLOY_DIR/docker-compose.yml"
 
 # Create .env with backend IP
