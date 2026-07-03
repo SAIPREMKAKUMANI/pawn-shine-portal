@@ -9,10 +9,12 @@ import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { DateDisplay } from "@/components/shared/date-display";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PageHeader } from "@/components/shared/page-header";
+import { formatCurrency } from "@/utils/format-currency";
 import { useCustomerDetail } from "@/hooks/use-customers.hook";
 import { useCustomerItems } from "@/hooks/use-items.hook";
 import { useCustomerBills } from "@/hooks/use-bills.hook";
-import { ArrowLeft, User, Phone, MapPin, FileText, Package, CreditCard, Users as UsersIcon, Calendar, Edit, Briefcase, Heart, Wallet, ArrowDownRight, ArrowUpRight, Plus, Loader2 } from "lucide-react";
+import { User, Phone, MapPin, FileText, Package, CreditCard, Users as UsersIcon, Calendar, Edit, Briefcase, Heart, Wallet, ArrowDownRight, ArrowUpRight, Plus, Loader2 } from "lucide-react";
 
 import { useCustomerWallet, useWalletTransactions, useDepositToWallet } from "@/hooks/use-wallet.hook";
 import { useAccountsList } from "@/hooks/use-accounts.hook";
@@ -132,8 +134,8 @@ function BillsSection({ customerId }: { customerId: number }) {
   return (
     <div className="space-y-3">
       {bills.map((bill) => {
-        const isCreditBill = bill.bill_type === "CREDIT";
-        const hasPartialPayment = isCreditBill && bill.amount_paid > 0;
+        const isRedeemBill = bill.bill_type === "REDEEM";
+        const hasPartialPayment = isRedeemBill && bill.amount_paid > 0;
         const totalDue = bill.total_amount_lended + bill.interest_accumulated;
         const paidPct = totalDue > 0 ? Math.min(100, (bill.amount_paid / totalDue) * 100) : 0;
 
@@ -148,10 +150,10 @@ function BillsSection({ customerId }: { customerId: number }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm">{bill.bill_id}</p>
-                    {isCreditBill && <StatusBadge status={bill.status} />}
+                    {isRedeemBill && <StatusBadge status={bill.status} />}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {isCreditBill ? "Pledge" : "Redemption"} • <DateDisplay dateString={bill.bill_date} />
+                    {isRedeemBill ? "Pledge" : "Redemption"} • <DateDisplay dateString={bill.bill_date} />
                   </p>
                 </div>
                 <div className="text-right">
@@ -284,7 +286,15 @@ function WalletSection({ customerId }: { customerId: number }) {
                     <Select value={accountId} onValueChange={setAccountId}>
                       <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                       <SelectContent>
-                        {activeAccounts.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.bank_name}</SelectItem>)}
+                        {activeAccounts.map(a => {
+                          const absBalance = formatCurrency(Math.abs(a.balance));
+                          const suffix = a.balance < 0 ? "Lent" : "In Hand";
+                          return (
+                            <SelectItem key={a.id} value={a.id.toString()}>
+                              {a.bank_name} (Bal: {absBalance} {suffix})
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -347,12 +357,10 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex items-center gap-4 mb-4">
-        <Button variant="outline" size="icon" onClick={() => navigate("/customers")} className="rounded-full shadow-sm hover:shadow-md transition-all">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Customer Profile</h1>
-      </div>
+      <PageHeader
+        title="Customer Profile"
+        backTo="/customers"
+      />
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-[350px_1fr]">
         {/* Sidebar */}

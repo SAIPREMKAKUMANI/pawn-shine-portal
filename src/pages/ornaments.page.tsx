@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PageHeader } from "@/components/shared/page-header";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { useOrnamentsList, useCreateOrnament, useUpdateOrnament } from "@/hooks/use-ornaments.hook";
 import { Gem, Plus, Loader2, Edit } from "lucide-react";
@@ -114,15 +115,15 @@ export default function OrnamentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Ornaments Catalog</h1>
-          <p className="text-muted-foreground">Manage jewelry types and their standard rates</p>
-        </div>
-        <Button onClick={() => { setEditingOrnament(null); setDialogOpen(true); }} className="gap-2">
-          <Plus className="h-4 w-4" /> Add Ornament Type
-        </Button>
-      </div>
+      <PageHeader
+        title="Ornaments Catalog"
+        description="Manage jewelry types and their standard rates"
+        action={
+          <Button onClick={() => { setEditingOrnament(null); setDialogOpen(true); }} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Ornament Type
+          </Button>
+        }
+      />
 
       {!catalog.length ? (
         <EmptyState icon={Gem} title="No ornaments in catalog" description="Add ornament types to use them in pledge bills." />

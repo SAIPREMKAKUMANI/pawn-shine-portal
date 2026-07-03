@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,14 +11,179 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCustomersList } from "@/hooks/use-customers.hook";
 import { useOrnamentsList } from "@/hooks/use-ornaments.hook";
 import { useAccountsList } from "@/hooks/use-accounts.hook";
+import { PageHeader } from "@/components/shared/page-header";
 import { useCreatePledgeBill } from "@/hooks/use-bills.hook";
 import { pledgeBillSchema, type PledgeBillFormValues } from "@/validators/pledge-bill.schema";
 import { formatDateForApi } from "@/utils/format-date";
-import { Plus, Trash2, Loader2, IndianRupee, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, Loader2, IndianRupee, Check, ChevronsUpDown, X } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+
+// ─── Custom Hooks & Components for Image Uploading ──────────────────────────
+
+function useFilePreview(file: File | string | undefined) {
+  const [preview, setPreview] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!file) {
+      setPreview(undefined);
+      return;
+    }
+    if (file instanceof File) {
+      const url = URL.createObjectURL(file);
+      setPreview(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+    setPreview(file);
+  }, [file]);
+
+  return preview;
+}
+
+interface ItemImageUploaderProps {
+  primaryValue: File | undefined;
+  secondaryValues: (File | undefined)[];
+  onChangePrimary: (file: File | undefined) => void;
+  onChangeSecondary: (index: number, file: File | undefined) => void;
+}
+
+function ItemImageUploader({
+  primaryValue,
+  secondaryValues,
+  onChangePrimary,
+  onChangeSecondary,
+}: ItemImageUploaderProps) {
+  const primaryInputRef = useRef<HTMLInputElement>(null);
+  const secondaryRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+  ];
+
+  const primaryPreview = useFilePreview(primaryValue);
+  const secondaryPreviews = [
+    useFilePreview(secondaryValues[0]),
+    useFilePreview(secondaryValues[1]),
+    useFilePreview(secondaryValues[2]),
+  ];
+
+  return (
+    <div className="w-full md:w-[240px] shrink-0 flex flex-col gap-3">
+      {/* Primary Image Upload Box */}
+      <input
+        ref={primaryInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            onChangePrimary(e.target.files[0]);
+          }
+        }}
+      />
+      {primaryPreview ? (
+        <div className="relative w-full aspect-square border-2 border-dashed border-muted-foreground/30 rounded-lg overflow-hidden group bg-muted/5 flex items-center justify-center">
+          <img
+            src={primaryPreview}
+            alt="Primary Collateral"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => primaryInputRef.current?.click()}
+            >
+              Replace
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                onChangePrimary(undefined);
+                if (primaryInputRef.current) primaryInputRef.current.value = "";
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onClick={() => primaryInputRef.current?.click()}
+          className="w-full aspect-square border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 rounded-lg flex flex-col items-center justify-center p-4 text-center cursor-pointer hover:bg-muted/5 select-none transition-colors"
+        >
+          <Plus className="h-8 w-8 text-muted-foreground/60 mb-2" />
+          <span className="text-sm font-semibold text-foreground">Upload Primary Image</span>
+          <span className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</span>
+        </div>
+      )}
+
+      {/* Secondary Image Boxes */}
+      <div className="grid grid-cols-3 gap-2">
+        {[0, 1, 2].map((idx) => {
+          const preview = secondaryPreviews[idx];
+          return (
+            <div key={idx} className="relative aspect-square">
+              <input
+                ref={secondaryRefs[idx]}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    onChangeSecondary(idx, e.target.files[0]);
+                  }
+                }}
+              />
+              {preview ? (
+                <div className="relative w-full h-full border-2 border-dashed border-muted-foreground/20 rounded-lg overflow-hidden group bg-muted/5 flex items-center justify-center">
+                  <img
+                    src={preview}
+                    alt={`Secondary ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="h-6 w-6 rounded-full"
+                      onClick={() => {
+                        onChangeSecondary(idx, undefined);
+                        if (secondaryRefs[idx].current) {
+                          secondaryRefs[idx].current.value = "";
+                        }
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => secondaryRefs[idx].current?.click()}
+                  className="w-full h-full border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 rounded-lg flex items-center justify-center cursor-pointer hover:bg-muted/5 transition-colors"
+                >
+                  <Plus className="h-5 w-5 text-muted-foreground/50" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page Component ─────────────────────────────────────────────────────
 
 export default function CreatePledgePage() {
   const navigate = useNavigate();
@@ -38,11 +203,23 @@ export default function CreatePledgePage() {
   const form = useForm<PledgeBillFormValues>({
     resolver: zodResolver(pledgeBillSchema),
     defaultValues: {
-      cust_id: initialCustomerId,
+      custId: initialCustomerId,
       notes: "",
-      bill_date: formatDateForApi(new Date()),
-      items: [{ ornament_id: 0, description: "", weight_gross: 0, weight_net: 0, amount: 0, interest_rate: 0, location: "", due_date: "", grace_period_days: 30 }],
-      accounts: [{ account_id: 0, amount: 0 }],
+      billDate: formatDateForApi(new Date()),
+      items: [{
+        ornamentId: 0,
+        description: "",
+        weightGross: 0,
+        weightNet: 0,
+        amount: 0,
+        interestRate: 0,
+        location: "",
+        dueDate: "",
+        gracePeriodDays: 30,
+        primaryImage: undefined,
+        secondaryImages: [undefined, undefined, undefined]
+      }],
+      accounts: [{ accountId: 0, amount: 0 }],
     },
   });
 
@@ -57,19 +234,53 @@ export default function CreatePledgePage() {
   const amountDiff = totalItemsAmount - totalAccountsAmount;
 
   function onSubmit(values: PledgeBillFormValues) {
-    if (values.cust_id === 0) {
-      form.setError("cust_id", { message: "Select a customer" });
+    if (values.custId === 0) {
+      form.setError("custId", { message: "Select a customer" });
       return;
     }
-    if (values.items.some(i => i.ornament_id === 0)) {
-      form.setError("items.0.ornament_id", { message: "Select ornament type" });
+    if (values.items.some(i => i.ornamentId === 0)) {
+      form.setError("items.0.ornamentId", { message: "Select ornament type" });
       return;
     }
-    if (values.accounts.some(a => a.account_id === 0)) {
-      form.setError("accounts.0.account_id", { message: "Select an account" });
+    if (values.accounts.some(a => a.accountId === 0)) {
+      form.setError("accounts.0.accountId", { message: "Select an account" });
       return;
     }
-    pledgeMutation.mutate(values, {
+
+    const formData = new FormData();
+    formData.append("custId", values.custId.toString());
+    formData.append("billDate", values.billDate);
+    formData.append("notes", values.notes);
+
+    values.items.forEach((item, index) => {
+      formData.append(`items[${index}].ornamentId`, item.ornamentId.toString());
+      formData.append(`items[${index}].description`, item.description);
+      formData.append(`items[${index}].weightGross`, item.weightGross.toString());
+      formData.append(`items[${index}].weightNet`, item.weightNet.toString());
+      formData.append(`items[${index}].amount`, item.amount.toString());
+      formData.append(`items[${index}].interestRate`, item.interestRate.toString());
+      formData.append(`items[${index}].location`, item.location);
+      formData.append(`items[${index}].dueDate`, item.dueDate);
+      formData.append(`items[${index}].gracePeriodDays`, item.gracePeriodDays.toString());
+      
+      if (item.primaryImage instanceof File) {
+        formData.append(`items[${index}].itemImage`, item.primaryImage);
+      }
+      if (item.secondaryImages) {
+        item.secondaryImages.forEach((img) => {
+          if (img instanceof File) {
+            formData.append(`items[${index}].itemImage`, img);
+          }
+        });
+      }
+    });
+
+    values.accounts.forEach((acc, index) => {
+      formData.append(`accounts[${index}].accountId`, acc.accountId.toString());
+      formData.append(`accounts[${index}].amount`, acc.amount.toString());
+    });
+
+    pledgeMutation.mutate(formData, {
       onSuccess: () => navigate("/bills"),
     });
   }
@@ -79,24 +290,24 @@ export default function CreatePledgePage() {
     const id = parseInt(ornamentIdStr);
     const ornament = ornaments?.find(o => o.id === id);
     if (ornament) {
-      form.setValue(`items.${index}.ornament_id`, id);
-      form.setValue(`items.${index}.interest_rate`, ornament.default_interest_rate);
+      form.setValue(`items.${index}.ornamentId`, id);
+      form.setValue(`items.${index}.interestRate`, ornament.default_interest_rate);
     }
   }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold">New Pledge Bill</h1>
-        <p className="text-muted-foreground">Lend money against collateral</p>
-      </div>
+      <PageHeader
+        title="New Pledge Bill"
+        description="Lend money against collateral"
+      />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Card>
             <CardHeader><CardTitle>Bill Details</CardTitle></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <FormField control={form.control} name="cust_id" render={({ field }) => (
+              <FormField control={form.control} name="custId" render={({ field }) => (
                 <FormItem className="flex flex-col mt-2">
                   <FormLabel>Customer</FormLabel>
                   <Popover open={openCustomer} onOpenChange={setOpenCustomer}>
@@ -113,9 +324,9 @@ export default function CreatePledgePage() {
                         >
                           {field.value && customers
                             ? (() => {
-                                const c = customers.find((c) => c.cust_id === field.value);
-                                return c ? `${c.name} (ID: ${c.cust_id})` : "Select a customer";
-                              })()
+                               const c = customers.find((c) => c.cust_id === field.value);
+                               return c ? `${c.name} (ID: ${c.cust_id})` : "Select a customer";
+                             })()
                             : "Select a customer"}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -155,7 +366,7 @@ export default function CreatePledgePage() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="bill_date" render={({ field }) => (
+              <FormField control={form.control} name="billDate" render={({ field }) => (
                 <FormItem><FormLabel>Bill Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="notes" render={({ field }) => (
@@ -167,58 +378,98 @@ export default function CreatePledgePage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Collateral Items</CardTitle>
-              <Button type="button" variant="outline" size="sm" onClick={() => itemFields.append({ ornament_id: 0, description: "", weight_gross: 0, weight_net: 0, amount: 0, interest_rate: 0, location: "", due_date: "", grace_period_days: 30 })}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => itemFields.append({
+                  ornamentId: 0,
+                  description: "",
+                  weightGross: 0,
+                  weightNet: 0,
+                  amount: 0,
+                  interestRate: 0,
+                  location: "",
+                  dueDate: "",
+                  gracePeriodDays: 30,
+                  primaryImage: undefined,
+                  secondaryImages: [undefined, undefined, undefined]
+                })}
+              >
                 <Plus className="h-4 w-4 mr-1" /> Add Item
               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
               {itemFields.fields.map((itemField, index) => (
-                <div key={itemField.id} className="p-4 border rounded-lg relative space-y-4">
-                  {index > 0 && <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => itemFields.remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
-                  
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <FormField control={form.control} name={`items.${index}.ornament_id`} render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ornament Type</FormLabel>
-                        <Select onValueChange={(val) => handleOrnamentChange(index, val)} value={field.value ? field.value.toString() : ""}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            {ornaments?.map(o => <SelectItem key={o.id} value={o.id.toString()}>{o.type}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (
-                      <FormItem className="lg:col-span-3"><FormLabel>Description</FormLabel><FormControl><Input placeholder="e.g. 22K Gold Chain" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                  </div>
+                <div key={itemField.id} className="p-4 border rounded-lg relative flex flex-col md:flex-row gap-6">
+                  {index > 0 && <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 z-10" onClick={() => itemFields.remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
 
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <FormField control={form.control} name={`items.${index}.weight_gross`} render={({ field }) => (
-                      <FormItem><FormLabel>Gross Wt (g)</FormLabel><FormControl><Input type="number" step="0.001" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name={`items.${index}.weight_net`} render={({ field }) => (
-                      <FormItem><FormLabel>Net Wt (g)</FormLabel><FormControl><Input type="number" step="0.001" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name={`items.${index}.amount`} render={({ field }) => (
-                      <FormItem><FormLabel>Lend Amount (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name={`items.${index}.interest_rate`} render={({ field }) => (
-                      <FormItem><FormLabel>Interest %/mo</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                  </div>
+                  {/* LEFT SIDE: Image Upload Option */}
+                  <FormField
+                    control={form.control}
+                    name={`items.${index}`}
+                    render={({ field }) => (
+                      <ItemImageUploader
+                        primaryValue={field.value.primaryImage}
+                        secondaryValues={field.value.secondaryImages || [undefined, undefined, undefined]}
+                        onChangePrimary={(file) => {
+                          form.setValue(`items.${index}.primaryImage`, file);
+                        }}
+                        onChangeSecondary={(subIdx, file) => {
+                          const currentSec = [...(form.getValues(`items.${index}.secondaryImages`) || [undefined, undefined, undefined])];
+                          currentSec[subIdx] = file;
+                          form.setValue(`items.${index}.secondaryImages`, currentSec);
+                        }}
+                      />
+                    )}
+                  />
 
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <FormField control={form.control} name={`items.${index}.location`} render={({ field }) => (
-                      <FormItem><FormLabel>Storage Location</FormLabel><FormControl><Input placeholder="e.g. Locker A3" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name={`items.${index}.due_date`} render={({ field }) => (
-                      <FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name={`items.${index}.grace_period_days`} render={({ field }) => (
-                      <FormItem><FormLabel>Grace Period (Days)</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                    )} />
+                  {/* RIGHT SIDE: Form Input Fields */}
+                  <div className="flex-1 space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <FormField control={form.control} name={`items.${index}.ornamentId`} render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Ornament Type</FormLabel>
+                          <Select onValueChange={(val) => handleOrnamentChange(index, val)} value={field.value ? field.value.toString() : ""}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              {ornaments?.map(o => <SelectItem key={o.id} value={o.id.toString()}>{o.type}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (
+                        <FormItem className="lg:col-span-3"><FormLabel>Description</FormLabel><FormControl><Input placeholder="e.g. 22K Gold Chain" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                      <FormField control={form.control} name={`items.${index}.weightGross`} render={({ field }) => (
+                        <FormItem><FormLabel>Gross Wt (g)</FormLabel><FormControl><Input type="number" step="0.001" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.weightNet`} render={({ field }) => (
+                        <FormItem><FormLabel>Net Wt (g)</FormLabel><FormControl><Input type="number" step="0.001" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.amount`} render={({ field }) => (
+                        <FormItem><FormLabel>Lend Amount (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.interestRate`} render={({ field }) => (
+                        <FormItem><FormLabel>Interest %/mo</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <FormField control={form.control} name={`items.${index}.location`} render={({ field }) => (
+                        <FormItem><FormLabel>Storage Location</FormLabel><FormControl><Input placeholder="e.g. Locker A3" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.dueDate`} render={({ field }) => (
+                        <FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.gracePeriodDays`} render={({ field }) => (
+                        <FormItem><FormLabel>Grace Period (Days)</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -231,20 +482,28 @@ export default function CreatePledgePage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Funding Accounts</CardTitle>
-              <Button type="button" variant="outline" size="sm" onClick={() => accountFields.append({ account_id: 0, amount: 0 })}>
+              <Button type="button" variant="outline" size="sm" onClick={() => accountFields.append({ accountId: 0, amount: 0 })}>
                 <Plus className="h-4 w-4 mr-1" /> Add Account
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {accountFields.fields.map((accField, index) => (
                 <div key={accField.id} className="flex gap-4 items-end">
-                  <FormField control={form.control} name={`accounts.${index}.account_id`} render={({ field }) => (
+                  <FormField control={form.control} name={`accounts.${index}.accountId`} render={({ field }) => (
                     <FormItem className="flex-1">
                       <FormLabel>Account</FormLabel>
                       <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value ? field.value.toString() : ""}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger></FormControl>
                         <SelectContent>
-                          {activeAccounts.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.bank_name} (Bal: {formatCurrency(a.balance)})</SelectItem>)}
+                          {activeAccounts.map(a => {
+                            const absBalance = formatCurrency(Math.abs(a.balance));
+                            const suffix = a.balance < 0 ? "Lent" : "In Hand";
+                            return (
+                              <SelectItem key={a.id} value={a.id.toString()}>
+                                {a.bank_name} (Bal: {absBalance} {suffix})
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                       <FormMessage />

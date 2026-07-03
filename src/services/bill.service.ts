@@ -2,27 +2,27 @@ import apiClient from "@/lib/api-client";
 import type {
   BillDto,
   PaginatedResponse,
-  PledgeBillRequest,
-  RedeemBillRequest,
 } from "@/types/api.types";
 import type { BillType } from "@/types/enums";
 
 export async function submitPledgeBill(
-  request: PledgeBillRequest,
+  formData: FormData,
 ): Promise<BillDto> {
   const response = await apiClient.post<BillDto>(
     "/api/bills/pledge",
-    request,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
   return response.data;
 }
 
 export async function submitRedeemBill(
-  request: RedeemBillRequest,
+  formData: FormData,
 ): Promise<BillDto> {
   const response = await apiClient.post<BillDto>(
     "/api/bills/redeem",
-    request,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
   return response.data;
 }

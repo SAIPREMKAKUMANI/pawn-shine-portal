@@ -8,6 +8,7 @@ import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useCustomersPage, useCustomerCount } from "@/hooks/use-customers.hook";
 import { useAuthImage } from "@/hooks/use-auth-image.hook";
+import { PageHeader } from "@/components/shared/page-header";
 import { Search, UserPlus, Users } from "lucide-react";
 import type { CustomerBase } from "@/types/api.types";
 
@@ -75,18 +76,16 @@ export default function CustomersListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Customers</h1>
-          <p className="text-muted-foreground">
-            {customerCount !== undefined ? `${customerCount} registered customers` : "Loading..."}
-          </p>
-        </div>
-        <Button onClick={() => navigate("/customers/new")} className="gap-2">
-          <UserPlus className="h-4 w-4" />
-          Add Customer
-        </Button>
-      </div>
+      <PageHeader
+        title="Customers"
+        description={customerCount !== undefined ? `${customerCount} registered customers` : "Loading..."}
+        action={
+          <Button onClick={() => navigate("/customers/new")} className="gap-2">
+            <UserPlus className="h-4 w-4" />
+            Add Customer
+          </Button>
+        }
+      />
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input

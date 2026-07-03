@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
+import { PageHeader } from "@/components/shared/page-header";
 import { useDashboardStats } from "@/hooks/use-items.hook";
 import { useAllTransactions } from "@/hooks/use-accounts.hook";
 import { useBillsList } from "@/hooks/use-bills.hook";
@@ -30,7 +31,7 @@ export default function ReportsPage() {
   const recentDays = bills.reduce((acc, bill) => {
     const date = formatDisplayDate(bill.bill_date);
     if (!acc[date]) acc[date] = { date, lended: 0, received: 0 };
-    if (bill.bill_type === "CREDIT") acc[date].lended += bill.total_amount_lended;
+    if (bill.bill_type === "PLEDGE") acc[date].lended += bill.total_amount_lended;
     else acc[date].received += bill.amount_paid;
     return acc;
   }, {} as Record<string, { date: string, lended: number, received: number }>);
@@ -39,10 +40,10 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Analytics & Reports</h1>
-        <p className="text-muted-foreground">Financial overview and business health</p>
-      </div>
+      <PageHeader
+        title="Analytics & Reports"
+        description="Financial overview and business health"
+      />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -69,7 +70,7 @@ export default function ReportsPage() {
           <CardContent className="flex justify-center items-center h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={cashFlowData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                <Pie data={cashFlowData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {cashFlowData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
@@ -85,7 +86,7 @@ export default function ReportsPage() {
               <BarChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" fontSize={12} />
-                <YAxis fontSize={12} tickFormatter={value => `₹${value/1000}k`} />
+                <YAxis fontSize={12} tickFormatter={value => `₹${value / 1000}k`} />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Bar dataKey="lended" name="Lended" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="received" name="Received" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} />

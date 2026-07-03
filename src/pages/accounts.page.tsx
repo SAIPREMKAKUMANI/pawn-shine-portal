@@ -7,17 +7,44 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { DateDisplay } from "@/components/shared/date-display";
+import { PageHeader } from "@/components/shared/page-header";
 import { useAccountsList, useAccountTransactions, useCreateAccount } from "@/hooks/use-accounts.hook";
 import { createAccountSchema, type CreateAccountFormValues } from "@/validators/account.schema";
 import { AccountType } from "@/types/enums";
 
-import { Wallet, Plus, ArrowRight, Loader2, Building, Banknote } from "lucide-react";
+import {
+  Wallet,
+  Plus,
+  ArrowRight,
+  Loader2,
+  Building,
+  Banknote,
+  TrendingUp,
+  TrendingDown,
+  Scale,
+} from "lucide-react";
 
-function CreateAccountDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
+// ─── Utilities ───────────────────────────────────────────────
+
+/**
+ * Converts underscore-separated enum values to readable title case.
+ * e.g. "CASH_COUNTER" → "Cash Counter", "PRIMARY_ACCOUNT" → "Primary Account"
+ */
+function humanizeLabel(value: string): string {
+  return value
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+// ─── Create Account Dialog ──────────────────────────────────
+
+function CreateAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const createMutation = useCreateAccount();
   const form = useForm<CreateAccountFormValues>({
     resolver: zodResolver(createAccountSchema),
@@ -70,6 +97,8 @@ function CreateAccountDialog({ open, onOpenChange }: { open: boolean, onOpenChan
   );
 }
 
+// ─── Zone 4: Transaction History ────────────────────────────
+
 function AccountTransactions({ accountId }: { accountId: number }) {
   const { data: page, isLoading } = useAccountTransactions(accountId);
 
@@ -80,23 +109,36 @@ function AccountTransactions({ accountId }: { accountId: number }) {
 
   return (
     <div className="space-y-3 mt-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
-      {transactions.map(t => (
-        <div key={t.id} className="flex justify-between items-center p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-          <div>
-            <p className="font-medium text-sm">{t.description}</p>
-            <div className="flex gap-2 text-xs text-muted-foreground mt-1">
-              <span>{t.reference_id}</span> • <DateDisplay dateString={t.transaction_date} />
+      {transactions.map((t) => {
+        const isCredit = t.transaction_type === "CREDIT";
+        const absBalanceAfter = Math.abs(t.balance_after);
+        const balanceLabel = t.balance_after < 0 ? "Lent" : "In Hand";
+
+        return (
+          <div key={t.id} className="flex justify-between items-center p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+            <div>
+              <p className="font-medium text-sm">{t.description}</p>
+              <div className="flex gap-2 text-xs text-muted-foreground mt-1">
+                <span>{t.reference_id}</span> • <DateDisplay dateString={t.transaction_date} />
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`font-semibold text-sm ${isCredit ? "text-emerald-600" : "text-red-600"}`}>
+                {isCredit ? "+" : "-"}
+                <CurrencyDisplay amount={t.amount} />
+              </span>
+              <p className="text-xs text-muted-foreground mt-1">
+                Bal: <CurrencyDisplay amount={absBalanceAfter} /> <span className="opacity-70">({balanceLabel})</span>
+              </p>
             </div>
           </div>
-          <div className="text-right">
-            <CurrencyDisplay amount={t.amount} className={`font-semibold text-sm ${t.transaction_type === "CREDIT" ? "text-emerald-600" : "text-red-600"}`} />
-            <p className="text-xs text-muted-foreground mt-1">Bal: <CurrencyDisplay amount={t.balance_after} /></p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
+// ─── Main Page ──────────────────────────────────────────────
 
 export default function AccountsPage() {
   const { data: accounts, isLoading } = useAccountsList();
@@ -106,70 +148,155 @@ export default function AccountsPage() {
   if (isLoading) return <LoadingSpinner message="Loading accounts..." />;
   const activeAccounts = accounts ?? [];
 
-  const totalBalance = activeAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  // Derive all totals from the accounts array — no extra API calls
+  const totalDisbursed = activeAccounts.reduce((s, a) => s + a.disbursed_amount, 0);
+  const totalRepaid = activeAccounts.reduce((s, a) => s + a.repaid_amount, 0);
+  const totalBalance = activeAccounts.reduce((s, a) => s + a.balance, 0);
+  const netLabel = totalBalance < 0 ? "Net Lent" : "Net Inflow";
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Accounts</h1>
-          <p className="text-muted-foreground">Manage shop bank and cash accounts</p>
-        </div>
-        <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" /> Add Account
-        </Button>
-      </div>
+    <div className="space-y-4">
 
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-              <Wallet className="h-6 w-6 text-primary" />
+      {/* ── Zone 1: Boxed Header ─────────────────────────────── */}
+      <PageHeader
+        title="Accounts"
+        badge={
+          <Badge variant="default" className="text-xs">
+            {activeAccounts.length} {activeAccounts.length === 1 ? "Account" : "Accounts"}
+          </Badge>
+        }
+        action={
+          <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Account
+          </Button>
+        }
+      />
+
+      {/* ── Zone 2: Capital Flow Overview ────────────────────── */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        {/* Total Capital Disbursed */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+              <TrendingUp className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground font-medium">Total Balance Across All Accounts</p>
-              <CurrencyDisplay amount={totalBalance} className="text-3xl font-bold text-foreground" />
+              <p className="text-xs font-medium text-muted-foreground">Total Disbursed</p>
+              <CurrencyDisplay amount={totalDisbursed} className="text-xl font-bold text-foreground" />
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">
+        {/* Total Capital Repaid */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+              <TrendingDown className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Repaid</p>
+              <CurrencyDisplay amount={totalRepaid} className="text-xl font-bold text-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Net Cash Position */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Scale className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Net Cash Position</p>
+              <div className="flex items-center gap-2">
+                <CurrencyDisplay amount={Math.abs(totalBalance)} className="text-xl font-bold text-foreground" />
+                <Badge variant={totalBalance < 0 ? "warning" : "success"} className="text-[10px]">
+                  {netLabel}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Zone 3 & 4: Accounts Grid + Transaction History ── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+
+        {/* Zone 3: Your Accounts */}
+        <div className="space-y-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">Your Accounts</h2>
           {!activeAccounts.length ? (
             <EmptyState icon={Wallet} title="No accounts found" />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-              {activeAccounts.map((account) => (
-                <Card 
-                  key={account.id} 
-                  className={`cursor-pointer transition-all ${selectedAccountId === account.id ? "ring-2 ring-primary shadow-md" : "hover:shadow-[var(--shadow-gold)]"}`}
-                  onClick={() => setSelectedAccountId(account.id)}
-                >
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                        {account.account_type === AccountType.CASH ? <Banknote className="h-5 w-5 text-emerald-600" /> : <Building className="h-5 w-5 text-blue-600" />}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              {activeAccounts.map((account) => {
+                const absBalance = Math.abs(account.balance);
+                const isLent = account.balance < 0;
+                const directionLabel = isLent ? "Net Lent" : "Net Inflow";
+
+                return (
+                  <Card
+                    key={account.id}
+                    className={`cursor-pointer transition-all ${
+                      selectedAccountId === account.id
+                        ? "ring-2 ring-primary shadow-md border-primary/50"
+                        : "hover:shadow-[var(--shadow-gold)]"
+                    }`}
+                    onClick={() => setSelectedAccountId(account.id)}
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      {/* Top row: icon + name + balance */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                            {account.account_type === AccountType.CASH ? (
+                              <Banknote className="h-5 w-5 text-emerald-600" />
+                            ) : (
+                              <Building className="h-5 w-5 text-blue-600" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-semibold leading-none">{account.bank_name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {humanizeLabel(account.account_number)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <CurrencyDisplay amount={absBalance} className="font-bold" />
+                          <Badge
+                            variant={isLent ? "warning" : "success"}
+                            className="text-[10px] mt-1 block w-fit ml-auto"
+                          >
+                            {directionLabel}
+                          </Badge>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold leading-none">{account.bank_name}</p>
-                        <p className="text-sm text-muted-foreground mt-1">{account.account_number}</p>
+
+                      {/* Bottom row: disbursed / repaid metrics */}
+                      <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-2">
+                        <span>
+                          Disbursed: <CurrencyDisplay amount={account.disbursed_amount} className="font-medium text-foreground" />
+                        </span>
+                        <span>
+                          Repaid: <CurrencyDisplay amount={account.repaid_amount} className="font-medium text-foreground" />
+                        </span>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <CurrencyDisplay amount={account.balance} className={`font-bold ${account.balance < 0 ? "text-red-600" : ""}`} />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
 
+        {/* Zone 4: Transaction History */}
         <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Transaction History</CardTitle>
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <ArrowRight className="h-5 w-5 text-primary" />
+              Transaction History
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {selectedAccountId ? (

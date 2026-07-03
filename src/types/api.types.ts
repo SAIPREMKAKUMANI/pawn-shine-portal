@@ -117,6 +117,8 @@ export interface AccountDto {
   account_type: AccountType;
   balance: number;
   is_active: boolean;
+  disbursed_amount: number;
+  repaid_amount: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -159,10 +161,15 @@ export interface WalletTransactionDto {
   created_at?: string;
 }
 
+export interface WalletAccountRequest {
+  account_id: number;
+  amount: number;
+}
+
 export interface WalletDepositRequest {
   amount: number;
   notes?: string;
-  accounts: PledgeAccountRequest[];
+  accounts: WalletAccountRequest[];
 }
 
 export interface WalletAllocationDto {
@@ -199,7 +206,6 @@ export interface ItemDto {
   cust_id: number;
   customer_name: string;
   description: string;
-  image_url: string | null;
   weight_gross: number;
   weight_net: number;
   amount_lended: number;
@@ -260,36 +266,36 @@ export interface BillDto {
 }
 
 export interface PledgeItemRequest {
-  ornament_id: number;
+  ornamentId: number;
   description: string;
-  weight_gross: number;
-  weight_net: number;
+  weightGross: number;
+  weightNet: number;
   amount: number;
-  interest_rate: number;
+  interestRate: number;
   location: string;
-  due_date: string;
-  grace_period_days: number;
+  dueDate: string;
+  gracePeriodDays: number;
 }
 
 export interface PledgeAccountRequest {
-  account_id: number;
+  accountId: number;
   amount: number;
 }
 
 export interface PledgeBillRequest {
-  cust_id: number;
+  custId: number;
   notes: string;
-  bill_date: string;
+  billDate: string;
   items: PledgeItemRequest[];
   accounts: PledgeAccountRequest[];
 }
 
 export interface RedeemBillRequest {
-  cust_id: number;
-  item_ids: number[];
+  custId: number;
+  itemIds: number[];
   notes: string;
-  bill_date: string;
-  wallet_amount_used?: number;
+  billDate: string;
+  walletAmountUsed?: number;
   accounts: PledgeAccountRequest[];
 }
 

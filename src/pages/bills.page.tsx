@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { DateDisplay } from "@/components/shared/date-display";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { PageHeader } from "@/components/shared/page-header";
 import { useBillsList, useBillsByType, useBillDetail } from "@/hooks/use-bills.hook";
 import { BillType, PaymentDirection } from "@/types/enums";
 import { FileText, Search, Printer, ArrowDownRight, ArrowUpRight, Wallet } from "lucide-react";
@@ -83,11 +84,10 @@ function BillDetailDialog({ open, onOpenChange, billId }: { open: boolean, onOpe
                       <tr key={i} className="border-b last:border-0">
                         <td className="py-2"><DateDisplay dateString={alloc.deposit_date} /></td>
                         <td className="py-2">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            alloc.allocation_type === 'PRINCIPAL' 
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
-                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                          }`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${alloc.allocation_type === 'PRINCIPAL'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                            }`}>
                             {alloc.allocation_type}
                           </span>
                         </td>
@@ -113,7 +113,7 @@ function BillDetailDialog({ open, onOpenChange, billId }: { open: boolean, onOpe
                   <thead><tr className="text-muted-foreground text-left"><th className="pb-2">Account ID</th><th className="pb-2">Direction</th><th className="pb-2 text-right">Amount</th></tr></thead>
                   <tbody>
                     {bill.accounts.map((acc, i) => (
-                      <tr key={i} className="border-b last:border-0"><td className="py-2">{acc.account_id}</td><td className="py-2">{acc.direction === PaymentDirection.IN ? <span className="text-emerald-600 flex items-center gap-1"><ArrowDownRight className="h-3 w-3"/> IN</span> : <span className="text-red-600 flex items-center gap-1"><ArrowUpRight className="h-3 w-3"/> OUT</span>}</td><td className="py-2 text-right"><CurrencyDisplay amount={acc.amount} /></td></tr>
+                      <tr key={i} className="border-b last:border-0"><td className="py-2">{acc.account_id}</td><td className="py-2">{acc.direction === PaymentDirection.IN ? <span className="text-emerald-600 flex items-center gap-1"><ArrowDownRight className="h-3 w-3" /> IN</span> : <span className="text-red-600 flex items-center gap-1"><ArrowUpRight className="h-3 w-3" /> OUT</span>}</td><td className="py-2 text-right"><CurrencyDisplay amount={acc.amount} /></td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -179,7 +179,7 @@ function AllBills() {
   const [searchQuery, setSearchQuery] = useState("");
 
   if (isLoading) return <LoadingSpinner message="Loading bills..." />;
-  
+
   const bills = page?.content ?? [];
   const filtered = bills.filter(b => b.bill_id.toLowerCase().includes(searchQuery.toLowerCase()) || b.customer_name.toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -203,10 +203,7 @@ function TypedBills({ type }: { type: BillType }) {
 export default function BillsPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Bills & Ledger</h1>
-        <p className="text-muted-foreground">View and print all transaction receipts</p>
-      </div>
+      <PageHeader title="Bills & Ledger" />
 
       <Card>
         <CardContent className="p-6">

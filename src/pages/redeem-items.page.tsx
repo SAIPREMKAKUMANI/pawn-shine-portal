@@ -13,6 +13,7 @@ import { useCustomersList } from "@/hooks/use-customers.hook";
 import { useActiveCustomerItems } from "@/hooks/use-items.hook";
 import { useAccountsList } from "@/hooks/use-accounts.hook";
 import { useRedeemBill } from "@/hooks/use-bills.hook";
+import { PageHeader } from "@/components/shared/page-header";
 import { redeemBillSchema, type RedeemBillFormValues } from "@/validators/redeem-bill.schema";
 import { formatDateForApi } from "@/utils/format-date";
 import { formatCurrency } from "@/utils/format-currency";
@@ -44,25 +45,25 @@ export default function RedeemItemsPage() {
   const form = useForm<RedeemBillFormValues>({
     resolver: zodResolver(redeemBillSchema),
     defaultValues: {
-      cust_id: preselectedCustomerId ?? 0,
+      custId: preselectedCustomerId ?? 0,
       notes: "",
-      bill_date: formatDateForApi(new Date()),
-      item_ids: [],
-      wallet_amount_used: 0,
-      accounts: [{ account_id: 0, amount: 0 }],
+      billDate: formatDateForApi(new Date()),
+      itemIds: [],
+      walletAmountUsed: 0,
+      accounts: [{ accountId: 0, amount: 0 }],
     },
   });
 
   const accountFields = useFieldArray({ control: form.control, name: "accounts" });
   
-  const watchItemIds = form.watch("item_ids");
+  const watchItemIds = form.watch("itemIds");
   const watchAccounts = form.watch("accounts");
 
   // Auto-select customer from URL params
   useEffect(() => {
     if (preselectedCustomerId && !hasAutoSelected) {
       setSelectedCustomerId(preselectedCustomerId);
-      form.setValue("cust_id", preselectedCustomerId);
+      form.setValue("custId", preselectedCustomerId);
     }
   }, [preselectedCustomerId, hasAutoSelected, form]);
 
@@ -71,7 +72,7 @@ export default function RedeemItemsPage() {
     if (preselectedItemId && activeItems && !hasAutoSelected) {
       const itemExists = activeItems.some(i => i.id === preselectedItemId);
       if (itemExists) {
-        form.setValue("item_ids", [preselectedItemId], { shouldValidate: true });
+        form.setValue("itemIds", [preselectedItemId], { shouldValidate: true });
         setHasAutoSelected(true);
       }
     }
@@ -96,9 +97,9 @@ export default function RedeemItemsPage() {
   const remainingToPay = Math.max(0, totalOutstandingToPay - totalWalletUsed);
   const walletCoversAll = remainingToPay <= 0 && totalOutstandingToPay > 0;
 
-  // Auto-set wallet_amount_used on the form whenever selection changes
+  // Auto-set walletAmountUsed on the form whenever selection changes
   useEffect(() => {
-    form.setValue("wallet_amount_used", totalWalletUsed);
+    form.setValue("walletAmountUsed", totalWalletUsed);
   }, [totalWalletUsed, form]);
 
   const totalAccountsAmount = useMemo(() => watchAccounts.reduce((sum, acc) => sum + (Number(acc.amount) || 0), 0), [watchAccounts]);
@@ -107,59 +108,72 @@ export default function RedeemItemsPage() {
   function handleCustomerSelect(custIdStr: string) {
     const custId = parseInt(custIdStr);
     setSelectedCustomerId(custId);
-    form.setValue("cust_id", custId);
-    form.setValue("item_ids", []); // Reset items when customer changes
+    form.setValue("custId", custId);
+    form.setValue("itemIds", []); // Reset items when customer changes
     setHasAutoSelected(false);
   }
 
   function handleItemToggle(itemId: number, checked: boolean) {
-    const current = form.getValues("item_ids");
+    const current = form.getValues("itemIds");
     if (checked) {
-      form.setValue("item_ids", [...current, itemId], { shouldValidate: true });
+      form.setValue("itemIds", [...current, itemId], { shouldValidate: true });
     } else {
-      form.setValue("item_ids", current.filter(id => id !== itemId), { shouldValidate: true });
+      form.setValue("itemIds", current.filter(id => id !== itemId), { shouldValidate: true });
     }
   }
 
   function onSubmit(values: RedeemBillFormValues) {
-    if (values.cust_id === 0) {
-      form.setError("cust_id", { message: "Select a customer" });
+    if (values.custId === 0) {
+      form.setError("custId", { message: "Select a customer" });
       return;
     }
     
     // Filter out accounts with 0 amount to avoid backend errors
-    const validAccounts = values.accounts.filter(a => a.amount > 0 && a.account_id > 0);
+    const validAccounts = values.accounts.filter(a => a.amount > 0 && a.accountId > 0);
     
-    // If wallet covers all, send empty accounts
-    const finalValues = {
-      ...values,
-      wallet_amount_used: totalWalletUsed,
-      accounts: walletCoversAll ? [] : validAccounts,
-    };
-    
-    if (!walletCoversAll && validAccounts.some(a => a.account_id === 0)) {
-      form.setError("accounts.0.account_id", { message: "Select an account" });
+    if (!walletCoversAll && validAccounts.some(a => a.accountId === 0)) {
+      form.setError("accounts.0.accountId", { message: "Select an account" });
       return;
     }
-    
-    redeemMutation.mutate(finalValues, {
+
+    const formData = new FormData();
+    formData.append("custId", values.custId.toString());
+    formData.append("billDate", values.billDate);
+    formData.append("notes", values.notes || "");
+
+    values.itemIds.forEach((itemId) => {
+      formData.append("itemIds", itemId.toString());
+    });
+
+    if (totalWalletUsed > 0) {
+      formData.append("walletAmountUsed", totalWalletUsed.toString());
+    }
+
+    if (!walletCoversAll) {
+      validAccounts.forEach((acc, index) => {
+        formData.append(`accounts[${index}].accountId`, acc.accountId.toString());
+        formData.append(`accounts[${index}].amount`, acc.amount.toString());
+      });
+    }
+
+    redeemMutation.mutate(formData, {
       onSuccess: () => navigate("/bills"),
     });
   }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold">Redeem Items</h1>
-        <p className="text-muted-foreground">Process customer payments and release collateral</p>
-      </div>
+      <PageHeader
+        title="Redeem Items"
+        description="Process customer payments and release collateral"
+      />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Card>
             <CardHeader><CardTitle>1. Select Customer</CardTitle></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <FormField control={form.control} name="cust_id" render={({ field }) => (
+              <FormField control={form.control} name="custId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer</FormLabel>
                   <Select onValueChange={handleCustomerSelect} value={field.value ? field.value.toString() : ""}>
@@ -171,7 +185,7 @@ export default function RedeemItemsPage() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="bill_date" render={({ field }) => (
+              <FormField control={form.control} name="billDate" render={({ field }) => (
                 <FormItem><FormLabel>Redemption Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
             </CardContent>
@@ -187,7 +201,7 @@ export default function RedeemItemsPage() {
                   <div className="py-8 text-center text-muted-foreground">This customer has no active pledged items.</div>
                 ) : (
                   <div className="space-y-4">
-                    <FormField control={form.control} name="item_ids" render={() => (
+                    <FormField control={form.control} name="itemIds" render={() => (
                       <FormItem>
                         <div className="mb-4"><FormLabel className="text-base">Pledged Items</FormLabel><FormMessage /></div>
                         {activeItems.map(item => {
@@ -369,19 +383,27 @@ export default function RedeemItemsPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <p className="font-medium text-sm">Cash/Bank Payments</p>
-                      <Button type="button" variant="outline" size="sm" onClick={() => accountFields.append({ account_id: 0, amount: 0 })}>
+                      <Button type="button" variant="outline" size="sm" onClick={() => accountFields.append({ accountId: 0, amount: 0 })}>
                         <Plus className="h-4 w-4 mr-1" /> Add Account
                       </Button>
                     </div>
                     {accountFields.fields.map((accField, index) => (
                       <div key={accField.id} className="flex gap-4 items-end">
-                      <FormField control={form.control} name={`accounts.${index}.account_id`} render={({ field }) => (
+                      <FormField control={form.control} name={`accounts.${index}.accountId`} render={({ field }) => (
                         <FormItem className="flex-1">
                           <FormLabel>Deposit To</FormLabel>
                           <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value ? field.value.toString() : ""}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger></FormControl>
                             <SelectContent>
-                              {activeAccounts.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.bank_name}</SelectItem>)}
+                              {activeAccounts.map(a => {
+                                const absBalance = formatCurrency(Math.abs(a.balance));
+                                const suffix = a.balance < 0 ? "Lent" : "In Hand";
+                                return (
+                                  <SelectItem key={a.id} value={a.id.toString()}>
+                                    {a.bank_name} (Bal: {absBalance} {suffix})
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                           <FormMessage />

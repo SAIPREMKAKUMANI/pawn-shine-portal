@@ -4,6 +4,7 @@ import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { DateDisplay } from "@/components/shared/date-display";
+import { PageHeader } from "@/components/shared/page-header";
 import { useDashboardStats } from "@/hooks/use-items.hook";
 import { useAccountsList } from "@/hooks/use-accounts.hook";
 import { useBillsList } from "@/hooks/use-bills.hook";
@@ -74,15 +75,25 @@ function AccountBalances() {
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((account) => (
-            <div key={account.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-              <div>
-                <p className="font-medium text-sm">{account.bank_name}</p>
-                <p className="text-xs text-muted-foreground">{account.account_number}</p>
+          {accounts.map((account) => {
+            const absBalance = Math.abs(account.balance);
+            const isLent = account.balance < 0;
+
+            return (
+              <div key={account.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                <div>
+                  <p className="font-medium text-sm">{account.bank_name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-muted-foreground">{account.account_number}</p>
+                    <span className={`text-[10px] font-medium ${isLent ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      • {isLent ? "Net Lent" : "Net Inflow"}
+                    </span>
+                  </div>
+                </div>
+                <CurrencyDisplay amount={absBalance} className="font-semibold text-foreground" />
               </div>
-              <CurrencyDisplay amount={account.balance} className={`font-semibold ${account.balance < 0 ? "text-red-600" : "text-primary"}`} />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -107,7 +118,7 @@ function RecentBills() {
                 <p className="font-medium text-sm">{bill.customer_name}</p>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">{bill.bill_id}</span>
-                  <StatusBadge status={bill.bill_type === "CREDIT" ? "PLEDGE" : "REDEEM"} />
+                  <StatusBadge status={bill.bill_type} />
                 </div>
               </div>
               <div className="text-right">
@@ -152,10 +163,10 @@ function DashboardChart() {
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to your pawn broking management system</p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Welcome to your pawn broking management system"
+      />
       <StatsCards />
       <div className="grid gap-6 lg:grid-cols-2">
         <AccountBalances />

@@ -9,14 +9,13 @@ import {
   fetchBillsByType,
 } from "@/services/bill.service";
 import { ApiError } from "@/lib/api-client";
-import type { PledgeBillRequest, RedeemBillRequest } from "@/types/api.types";
 import type { BillType } from "@/types/enums";
 
 export function useCreatePledgeBill() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (request: PledgeBillRequest) => submitPledgeBill(request),
+    mutationFn: (formData: FormData) => submitPledgeBill(formData),
     onSuccess: (response) => {
       toast.success(`Pledge bill ${response.bill_id} created`);
       queryClient.invalidateQueries({ queryKey: ["bills"] });
@@ -37,7 +36,7 @@ export function useRedeemBill() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (request: RedeemBillRequest) => submitRedeemBill(request),
+    mutationFn: (formData: FormData) => submitRedeemBill(formData),
     onSuccess: (response) => {
       toast.success(`Redemption bill ${response.bill_id} created`);
       queryClient.invalidateQueries({ queryKey: ["bills"] });

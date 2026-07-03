@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PageHeader } from "@/components/shared/page-header";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { DateDisplay } from "@/components/shared/date-display";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -160,10 +161,10 @@ function ItemsList({ status }: { status: ItemStatus }) {
 export default function ItemsPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Items Management</h1>
-        <p className="text-muted-foreground">Manage pledged collateral and record interest</p>
-      </div>
+      <PageHeader
+        title="Items Management"
+        description="Manage pledged collateral and record interest"
+      />
 
       <Tabs defaultValue={ItemStatus.ACTIVE}>
         <TabsList className="grid grid-cols-2 lg:grid-cols-5 w-full max-w-3xl h-auto">
