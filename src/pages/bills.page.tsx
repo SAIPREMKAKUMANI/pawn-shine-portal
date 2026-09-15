@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +11,49 @@ import { DateDisplay } from "@/components/shared/date-display";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { useBillsList, useBillsByType, useBillDetail } from "@/hooks/use-bills.hook";
+import { useItemDetails } from "@/hooks/use-items.hook";
 import { BillType, PaymentDirection } from "@/types/enums";
 import { FileText, Search, Printer, ArrowDownRight, ArrowUpRight, Wallet } from "lucide-react";
 
 function BillDetailDialog({ open, onOpenChange, billId }: { open: boolean, onOpenChange: (open: boolean) => void, billId: number | null }) {
   const { data: bill, isLoading } = useBillDetail(billId);
+
+  const itemIds = useMemo(() => bill?.items.map(i => i.item_id) ?? [], [bill]);
+  const { items: itemDetailsMap } = useItemDetails(itemIds);
+
+  // Compute table totals
+  const itemFinancials = useMemo(() => {
+    if (!bill) return [];
+    const isRedeem = bill.bill_type === BillType.REDEEM;
+    return bill.items.map(item => {
+      const detail = itemDetailsMap.get(item.item_id);
+      const desc = item.description || detail?.description || `Item #${item.item_id}`;
+      const principal = isRedeem
+        ? (detail ? detail.amount_lended : Math.max(0, item.amount - (bill.interest_accumulated / bill.items.length)))
+        : item.amount;
+      const interest = isRedeem
+        ? (detail ? detail.compound_interest : (bill.interest_accumulated / bill.items.length))
+        : 0;
+      const total = isRedeem ? item.amount : principal;
+
+      return {
+        item,
+        detail,
+        desc,
+        principal,
+        interest,
+        total,
+      };
+    });
+  }, [bill, itemDetailsMap]);
+
+  const totals = useMemo(() => {
+    return itemFinancials.reduce((acc, curr) => ({
+      principal: acc.principal + curr.principal,
+      interest: acc.interest + curr.interest,
+      grandTotal: acc.grandTotal + curr.total,
+    }), { principal: 0, interest: 0, grandTotal: 0 });
+  }, [itemFinancials]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -52,15 +90,44 @@ function BillDetailDialog({ open, onOpenChange, billId }: { open: boolean, onOpe
             </div>
 
             <div>
-              <h3 className="font-semibold border-b pb-2 mb-3">Items</h3>
-              <table className="w-full text-sm">
-                <thead><tr className="text-muted-foreground text-left"><th className="pb-2">Item ID</th><th className="pb-2">Action</th><th className="pb-2 text-right">Amount</th></tr></thead>
-                <tbody>
-                  {bill.items.map((item, i) => (
-                    <tr key={i} className="border-b last:border-0"><td className="py-2">{item.item_id}</td><td className="py-2"><StatusBadge status={item.action} /></td><td className="py-2 text-right"><CurrencyDisplay amount={item.amount} /></td></tr>
-                  ))}
-                </tbody>
-              </table>
+              <h3 className="font-semibold border-b pb-2 mb-3">Items & Financial Breakdown</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-muted-foreground text-left border-b">
+                      <th className="pb-2">Item</th>
+                      <th className="pb-2">Action</th>
+                      <th className="pb-2 text-right">Principal</th>
+                      <th className="pb-2 text-right">Interest</th>
+                      <th className="pb-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itemFinancials.map((fin, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="py-2.5">
+                          <span className="font-medium">{fin.desc}</span>
+                          <span className="text-xs text-muted-foreground block">
+                            ID: #{fin.item.item_id} {fin.detail ? `• ${fin.detail.weight_net}g` : ""}
+                          </span>
+                        </td>
+                        <td className="py-2.5"><StatusBadge status={fin.item.action} /></td>
+                        <td className="py-2.5 text-right"><CurrencyDisplay amount={fin.principal} /></td>
+                        <td className="py-2.5 text-right text-muted-foreground"><CurrencyDisplay amount={fin.interest} /></td>
+                        <td className="py-2.5 text-right font-semibold"><CurrencyDisplay amount={fin.total} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 font-semibold bg-muted/20">
+                      <td colSpan={2} className="py-2.5 px-1">Total</td>
+                      <td className="py-2.5 text-right"><CurrencyDisplay amount={totals.principal} /></td>
+                      <td className="py-2.5 text-right text-emerald-700 dark:text-emerald-400"><CurrencyDisplay amount={totals.interest} /></td>
+                      <td className="py-2.5 text-right text-primary font-bold"><CurrencyDisplay amount={totals.grandTotal} /></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
 
             {/* Wallet Usage Breakdown */}

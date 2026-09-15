@@ -2,14 +2,14 @@ import apiClient from "@/lib/api-client";
 import type {
   CustomerBase,
   CustomerDetail,
-  CustomerListResponse,
-  CustomerOnboardRequest,
+  GetAllCustomerResponse,
   CustomerOnboardResponse,
   PaginatedResponse,
+  GetAllCustomerBaseResponse,
 } from "@/types/api.types";
 
-export async function fetchAllCustomers(): Promise<CustomerBase[]> {
-  const response = await apiClient.get<CustomerListResponse>(
+export async function fetchAllCustomers(): Promise<GetAllCustomerBaseResponse[]> {
+  const response = await apiClient.get<GetAllCustomerResponse>(
     "/api/customer/get",
   );
   return response.data.customers ?? [];

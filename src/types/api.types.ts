@@ -35,8 +35,13 @@ export interface CustomerBase {
   image_url: string | null;
 }
 
-export interface CustomerListResponse {
-  customers: CustomerBase[];
+export interface GetAllCustomerBaseResponse {
+  cust_id: number;
+  name: string;
+}
+
+export interface GetAllCustomerResponse {
+  customers: GetAllCustomerBaseResponse[];
 }
 
 export interface ContactDto {
@@ -237,6 +242,15 @@ export interface BillItemDto {
   item_id: number;
   action: BillItemAction;
   amount: number;
+  ornament_id?: number;
+  description?: string;
+  weight_gross?: number;
+  weight_net?: number;
+  interest_rate?: number;
+  location?: string;
+  due_date?: string;
+  grace_period_days?: number;
+  item_images?: Array<{ id: number; itemId: number; imageUrl: string }>;
 }
 
 export interface BillAccountDto {

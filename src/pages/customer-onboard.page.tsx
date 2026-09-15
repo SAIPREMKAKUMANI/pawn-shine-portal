@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { compressImage } from "@/utils/compress-image";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +12,7 @@ import { useOnboardCustomer, useUpdateCustomer, useCustomerDetail } from "@/hook
 import { PageHeader } from "@/components/shared/page-header";
 import { customerOnboardSchema, type CustomerOnboardFormValues } from "@/validators/customer.schema";
 import { Gender, MaritalStatus } from "@/types/enums";
-import { Plus, Trash2, Loader2, Image as ImageIcon, Check, UploadCloud, X } from "lucide-react";
+import { Plus, Trash2, Loader2, Check, UploadCloud, X } from "lucide-react";
 import { useAuthImage } from "@/hooks/use-auth-image.hook";
 
 // ─── Custom Hooks & Previews ────────────────────────────────
@@ -111,8 +112,8 @@ function ImageUploadDropzone({
       onDragLeave={handleDrag}
       onDrop={handleDrop}
       className={`relative w-full border-2 border-dashed rounded-xl transition-all duration-200 overflow-hidden flex flex-col items-center justify-center bg-muted/5 ${isDragActive
-          ? "border-primary bg-primary/5 shadow-inner"
-          : "border-muted-foreground/30 hover:border-primary/50"
+        ? "border-primary bg-primary/5 shadow-inner"
+        : "border-muted-foreground/30 hover:border-primary/50"
         } ${className}`}
     >
       <input
@@ -620,7 +621,7 @@ export default function CustomerOnboardPage() {
         gender: customerData.gender,
         marital_status: customerData.marital_status,
         occupation: customerData.occupation || "",
-        image: customerData.image_url ? `/api/images/${customerData.cust_id}/PROFILE.${customerData.image_url.split('.').pop()}` : undefined,
+        image: customerData.image_url ? `/api/images/${customerData.cust_id}/PROFILE_${customerData.cust_id}` : undefined,
         contacts: customerData.contacts.map(c => ({
           contact_id: c.contact_id,
           phone: c.phone || "",
@@ -640,14 +641,14 @@ export default function CustomerOnboardPage() {
           id_proof_id: ip.id_proof_id,
           id_type: ip.id_type || "",
           id_number: ip.id_number || "",
-          image: ip.image_url ? `/api/images/${customerData.cust_id}/${ip.id_type}.${ip.image_url.split('.').pop()}` : undefined
+          image: ip.image_url ? `/api/images/${customerData.cust_id}/${ip.id_type}_${ip.id_proof_id}` : undefined
         })),
         relatives: customerData.relatives.map(r => ({
           relative_id: r.relative_id,
           name: r.name || "",
           relationship: r.relationship || "",
           contact_number: r.contact_number || "",
-          image: r.image_url ? `/api/images/${customerData.cust_id}/RELATIVE.${r.image_url.split('.').pop()}` : undefined
+          image: r.image_url ? `/api/images/${customerData.cust_id}/RELATIVE_${r.relative_id}` : undefined
         })),
       });
     }
@@ -669,7 +670,7 @@ export default function CustomerOnboardPage() {
     }
   };
 
-  function handleSubmitForm(values: CustomerOnboardFormValues) {
+  async function handleSubmitForm(values: CustomerOnboardFormValues) {
     if (step !== 3) return;
     const formData = new FormData();
     formData.append("name", values.name);
@@ -679,7 +680,8 @@ export default function CustomerOnboardPage() {
     formData.append("occupation", values.occupation);
 
     if (values.image instanceof File) {
-      formData.append("image", values.image);
+      const compressed = await compressImage(values.image);
+      formData.append("image", compressed);
     }
 
     values.contacts.forEach((contact, index) => {
@@ -699,24 +701,28 @@ export default function CustomerOnboardPage() {
       formData.append(`addresses[${index}].country`, address.country);
     });
 
-    values.id_proofs.forEach((idProof, index) => {
-      if (idProof.id_proof_id) formData.append(`idProofs[${index}].idProofId`, idProof.id_proof_id.toString());
-      formData.append(`idProofs[${index}].idType`, idProof.id_type);
-      formData.append(`idProofs[${index}].idNumber`, idProof.id_number);
-      if (idProof.image instanceof File) {
-        formData.append(`idProofs[${index}].image`, idProof.image);
-      }
-    });
+    for (let index = 0; index < values.id_proofs.length; index++) {
+       const idProof = values.id_proofs[index];
+       if (idProof.id_proof_id) formData.append(`idProofs[${index}].idProofId`, idProof.id_proof_id.toString());
+       formData.append(`idProofs[${index}].idType`, idProof.id_type);
+       formData.append(`idProofs[${index}].idNumber`, idProof.id_number);
+       if (idProof.image instanceof File) {
+         const compressedId = await compressImage(idProof.image);
+         formData.append(`idProofs[${index}].image`, compressedId);
+       }
+    }
 
-    values.relatives.forEach((relative, index) => {
-      if (relative.relative_id) formData.append(`relatives[${index}].relativeId`, relative.relative_id.toString());
-      formData.append(`relatives[${index}].name`, relative.name);
-      formData.append(`relatives[${index}].relationship`, relative.relationship);
-      formData.append(`relatives[${index}].contactNumber`, relative.contact_number);
-      if (relative.image instanceof File) {
-        formData.append(`relatives[${index}].image`, relative.image);
-      }
-    });
+    for (let index = 0; index < values.relatives.length; index++) {
+       const relative = values.relatives[index];
+       if (relative.relative_id) formData.append(`relatives[${index}].relativeId`, relative.relative_id.toString());
+       formData.append(`relatives[${index}].name`, relative.name);
+       formData.append(`relatives[${index}].relationship`, relative.relationship);
+       formData.append(`relatives[${index}].contactNumber`, relative.contact_number);
+       if (relative.image instanceof File) {
+         const compressedRel = await compressImage(relative.image);
+         formData.append(`relatives[${index}].image`, compressedRel);
+       }
+    }
 
     if (isEditMode && parsedId) {
       updateMutation.mutate({ customerId: parsedId, formData }, { onSuccess: () => navigate(`/customers/${parsedId}`) });
@@ -762,10 +768,10 @@ export default function CustomerOnboardPage() {
             return (
               <div key={s.id} className="flex items-center gap-4 group">
                 <div className={`h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 z-10 shrink-0 ${isActive
-                    ? "bg-gradient-to-br from-primary to-yellow-500 border-transparent text-primary-foreground shadow-[var(--shadow-gold)] scale-110"
-                    : isCompleted
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : "bg-background border-muted-foreground/30 text-muted-foreground"
+                  ? "bg-gradient-to-br from-primary to-yellow-500 border-transparent text-primary-foreground shadow-[var(--shadow-gold)] scale-110"
+                  : isCompleted
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "bg-background border-muted-foreground/30 text-muted-foreground"
                   }`}>
                   {isCompleted ? <Check className="h-5 w-5" /> : <span className="font-semibold">{s.id}</span>}
                 </div>
@@ -793,10 +799,10 @@ export default function CustomerOnboardPage() {
             return (
               <div key={s.id} className="flex flex-col items-center gap-2">
                 <div className={`h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${isActive
-                    ? "bg-gradient-to-br from-primary to-yellow-500 border-transparent text-primary-foreground shadow-[var(--shadow-gold)] scale-105"
-                    : isCompleted
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : "bg-background border-muted-foreground/30 text-muted-foreground"
+                  ? "bg-gradient-to-br from-primary to-yellow-500 border-transparent text-primary-foreground shadow-[var(--shadow-gold)] scale-105"
+                  : isCompleted
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : "bg-background border-muted-foreground/30 text-muted-foreground"
                   }`}>
                   {isCompleted ? <Check className="h-5 w-5" /> : <span className="font-semibold">{s.id}</span>}
                 </div>

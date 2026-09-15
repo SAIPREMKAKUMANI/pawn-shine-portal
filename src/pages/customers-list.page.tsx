@@ -21,8 +21,8 @@ function CustomerCard({ customer }: { customer: CustomerBase }) {
     .toUpperCase()
     .slice(0, 2);
 
-  const imageUrl = customer.image_url 
-    ? `/api/images/${customer.cust_id}/PROFILE.${customer.image_url.split('.').pop()}` 
+  const imageUrl = customer.image_url
+    ? `/api/images/${customer.cust_id}/PROFILE_${customer.cust_id}`
     : null;
   const authImageUrl = useAuthImage(imageUrl);
 
@@ -106,7 +106,7 @@ export default function CustomersListPage() {
           ))}
         </div>
       )}
-      
+
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-8">
           <Button

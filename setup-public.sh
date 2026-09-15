@@ -70,8 +70,34 @@ fi
 
 # -----------------------------------------------------------
 echo "[6/7] Allowing HTTP traffic..."
-# Allow HTTP traffic in iptables
-sudo iptables -I INPUT 6 -p tcp --dport 80 -j ACCEPT
+# Allow HTTP traffic on port 80 in iptables (inserted before the first REJECT rule if present, otherwise appended)
+if sudo iptables -C INPUT -p tcp --dport 80 -j ACCEPT >/dev/null 2>&1; then
+    echo "  HTTP port 80 rule already exists."
+else
+    REJECT_LINE=$(sudo iptables -L INPUT --line-numbers | grep -i "REJECT" | head -n 1 | awk '{print $1}')
+    if [ -n "$REJECT_LINE" ]; then
+        echo "  Inserting HTTP port 80 rule at position $REJECT_LINE (before REJECT rule)..."
+        sudo iptables -I INPUT "$REJECT_LINE" -p tcp --dport 80 -j ACCEPT
+    else
+        echo "  Appending HTTP port 80 rule to INPUT chain..."
+        sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+    fi
+fi
+
+# Allow HTTP traffic on port 8092 in iptables (inserted before the first REJECT rule if present, otherwise appended)
+if sudo iptables -C INPUT -p tcp --dport 8092 -j ACCEPT >/dev/null 2>&1; then
+    echo "  HTTP port 8092 rule already exists."
+else
+    REJECT_LINE=$(sudo iptables -L INPUT --line-numbers | grep -i "REJECT" | head -n 1 | awk '{print $1}')
+    if [ -n "$REJECT_LINE" ]; then
+        echo "  Inserting HTTP port 8092 rule at position $REJECT_LINE (before REJECT rule)..."
+        sudo iptables -I INPUT "$REJECT_LINE" -p tcp --dport 8092 -j ACCEPT
+    else
+        echo "  Appending HTTP port 8092 rule to INPUT chain..."
+        sudo iptables -A INPUT -p tcp --dport 8092 -j ACCEPT
+    fi
+fi2
+
 # Save the firewall rules so they persist after reboot
 sudo netfilter-persistent save
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { compressImage } from "@/utils/compress-image";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,10 +16,11 @@ import { PageHeader } from "@/components/shared/page-header";
 import { useCreatePledgeBill } from "@/hooks/use-bills.hook";
 import { pledgeBillSchema, type PledgeBillFormValues } from "@/validators/pledge-bill.schema";
 import { formatDateForApi } from "@/utils/format-date";
-import { Plus, Trash2, Loader2, IndianRupee, Check, ChevronsUpDown, X } from "lucide-react";
+import { Plus, Trash2, Loader2, IndianRupee, Check, ChevronsUpDown, X, User, ExternalLink } from "lucide-react";
 import { formatCurrency } from "@/utils/format-currency";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 
 // ─── Custom Hooks & Components for Image Uploading ──────────────────────────
@@ -233,7 +235,7 @@ export default function CreatePledgePage() {
   const totalAccountsAmount = useMemo(() => watchAccounts.reduce((sum, acc) => sum + (Number(acc.amount) || 0), 0), [watchAccounts]);
   const amountDiff = totalItemsAmount - totalAccountsAmount;
 
-  function onSubmit(values: PledgeBillFormValues) {
+  async function onSubmit(values: PledgeBillFormValues) {
     if (values.custId === 0) {
       form.setError("custId", { message: "Select a customer" });
       return;
@@ -252,7 +254,8 @@ export default function CreatePledgePage() {
     formData.append("billDate", values.billDate);
     formData.append("notes", values.notes);
 
-    values.items.forEach((item, index) => {
+    for (let index = 0; index < values.items.length; index++) {
+      const item = values.items[index];
       formData.append(`items[${index}].ornamentId`, item.ornamentId.toString());
       formData.append(`items[${index}].description`, item.description);
       formData.append(`items[${index}].weightGross`, item.weightGross.toString());
@@ -262,18 +265,20 @@ export default function CreatePledgePage() {
       formData.append(`items[${index}].location`, item.location);
       formData.append(`items[${index}].dueDate`, item.dueDate);
       formData.append(`items[${index}].gracePeriodDays`, item.gracePeriodDays.toString());
-      
+
       if (item.primaryImage instanceof File) {
-        formData.append(`items[${index}].itemImage`, item.primaryImage);
+        const compressedPrimary = await compressImage(item.primaryImage);
+        formData.append(`items[${index}].itemImage`, compressedPrimary);
       }
       if (item.secondaryImages) {
-        item.secondaryImages.forEach((img) => {
+        for (const img of item.secondaryImages) {
           if (img instanceof File) {
-            formData.append(`items[${index}].itemImage`, img);
+            const compressedSec = await compressImage(img);
+            formData.append(`items[${index}].itemImage`, compressedSec);
           }
-        });
+        }
       }
-    });
+    }
 
     values.accounts.forEach((acc, index) => {
       formData.append(`accounts[${index}].accountId`, acc.accountId.toString());
@@ -310,59 +315,85 @@ export default function CreatePledgePage() {
               <FormField control={form.control} name="custId" render={({ field }) => (
                 <FormItem className="flex flex-col mt-2">
                   <FormLabel>Customer</FormLabel>
-                  <Popover open={openCustomer} onOpenChange={setOpenCustomer}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={openCustomer}
-                          className={cn(
-                            "w-full justify-between",
-                            !field.value && "text-muted-foreground"
-                          )}
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <Popover open={openCustomer} onOpenChange={setOpenCustomer}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={openCustomer}
+                              className={cn(
+                                "w-full justify-between",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value && customers
+                                ? (() => {
+                                   const c = customers.find((c) => c.cust_id === field.value);
+                                   return c ? `${c.name} (ID: ${c.cust_id})` : "Select a customer";
+                                 })()
+                                : "Select a customer"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search customer by name or ID..." />
+                            <CommandList>
+                              <CommandEmpty>No customer found.</CommandEmpty>
+                              <CommandGroup>
+                                {customers?.map((c) => (
+                                  <CommandItem
+                                    value={`${c.cust_id} ${c.name}`}
+                                    key={c.cust_id}
+                                    onSelect={() => {
+                                      field.onChange(c.cust_id);
+                                      setOpenCustomer(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        c.cust_id === field.value
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    {c.name} (ID: {c.cust_id})
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </ContextMenuTrigger>
+                    {field.value ? (
+                      <ContextMenuContent className="w-56">
+                        <ContextMenuLabel>
+                          {customers?.find((c) => c.cust_id === field.value)?.name || "Customer Options"}
+                        </ContextMenuLabel>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                          className="cursor-pointer flex items-center gap-2"
+                          onClick={() => navigate(`/customers/${field.value}`)}
                         >
-                          {field.value && customers
-                            ? (() => {
-                               const c = customers.find((c) => c.cust_id === field.value);
-                               return c ? `${c.name} (ID: ${c.cust_id})` : "Select a customer";
-                             })()
-                            : "Select a customer"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search customer by name or ID..." />
-                        <CommandList>
-                          <CommandEmpty>No customer found.</CommandEmpty>
-                          <CommandGroup>
-                            {customers?.map((c) => (
-                              <CommandItem
-                                value={`${c.cust_id} ${c.name}`}
-                                key={c.cust_id}
-                                onSelect={() => {
-                                  field.onChange(c.cust_id);
-                                  setOpenCustomer(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    c.cust_id === field.value
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                {c.name} (ID: {c.cust_id})
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                          <User className="h-4 w-4" />
+                          View Customer Profile
+                          <ExternalLink className="ml-auto h-3 w-3 opacity-60" />
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    ) : (
+                      <ContextMenuContent className="w-56">
+                        <ContextMenuLabel className="text-muted-foreground text-xs font-normal">
+                          Select a customer first to view profile
+                        </ContextMenuLabel>
+                      </ContextMenuContent>
+                    )}
+                  </ContextMenu>
                   <FormMessage />
                 </FormItem>
               )} />

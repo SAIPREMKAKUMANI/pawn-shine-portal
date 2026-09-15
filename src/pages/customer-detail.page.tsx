@@ -195,7 +195,7 @@ function RelativesTab({ customerId, relatives }: { customerId: number, relatives
           <CardContent className="p-0">
             {relative.image_url && (
               <div className="aspect-video w-full bg-muted overflow-hidden relative">
-                <AuthImage src={`/api/images/${customerId}/RELATIVE.${relative.image_url.split('.').pop()}`} alt={relative.name} className="object-cover w-full h-full" />
+                <AuthImage src={`/api/images/${customerId}/RELATIVE_${relative.relative_id}`} alt={relative.name} className="object-cover w-full h-full" />
               </div>
             )}
             <div className="p-4 space-y-2">
@@ -370,7 +370,7 @@ export default function CustomerDetailPage() {
             <CardContent className="pt-10 pb-6 flex flex-col items-center text-center space-y-4">
               <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
                 {customer.image_url && (
-                  <AuthAvatarImage src={`/api/images/${customer.cust_id}/PROFILE.${customer.image_url.split('.').pop()}`} className="object-cover" />
+                  <AuthAvatarImage src={`/api/images/${customer.cust_id}/PROFILE_${customer.cust_id}`} className="object-cover" />
                 )}
                 <AvatarFallback className="text-3xl bg-primary/10 text-primary">{initials}</AvatarFallback>
               </Avatar>
@@ -430,7 +430,7 @@ export default function CustomerDetailPage() {
                         <CardContent className="p-0">
                           {proof.image_url && (
                             <div className="aspect-video w-full bg-muted overflow-hidden relative">
-                              <AuthImage src={`/api/images/${customer.cust_id}/${proof.id_type}.${proof.image_url.split('.').pop()}`} alt={proof.id_type} className="object-cover w-full h-full" />
+                              <AuthImage src={`/api/images/${customer.cust_id}/${proof.id_type}_${proof.id_proof_id}`} alt={proof.id_type} className="object-cover w-full h-full" />
                             </div>
                           )}
                           <div className="p-4 space-y-1">

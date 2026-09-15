@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Increase Node.js memory limit for the build (prevents OOM on small instances)
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+
 # Copy package files and install dependencies
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install

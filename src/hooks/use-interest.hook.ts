@@ -23,6 +23,9 @@ export function useRecordInterest() {
       queryClient.invalidateQueries({
         queryKey: ["current-interest", response.item_id],
       });
+      queryClient.invalidateQueries({ queryKey: ["customer-active-items"] });
+      queryClient.invalidateQueries({ queryKey: ["items-by-status"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-items"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },
     onError: (error: Error) => {

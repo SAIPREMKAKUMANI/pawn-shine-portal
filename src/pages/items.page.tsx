@@ -18,78 +18,8 @@ import { useRecordInterest, useInterestHistory } from "@/hooks/use-interest.hook
 import { interestRecordSchema, type InterestRecordFormValues } from "@/validators/interest.schema";
 import { ItemStatus } from "@/types/enums";
 import type { ItemDto } from "@/types/api.types";
-import { Package, Search, Calculator, Loader2, ArrowRight } from "lucide-react";
-
-function RecordInterestDialog({ open, onOpenChange, item }: { open: boolean, onOpenChange: (open: boolean) => void, item: ItemDto }) {
-  const recordMutation = useRecordInterest();
-  const form = useForm<InterestRecordFormValues>({
-    resolver: zodResolver(interestRecordSchema),
-    defaultValues: { item_id: item.id, interest_amount: 0 },
-  });
-
-  function onSubmit(values: InterestRecordFormValues) {
-    recordMutation.mutate(values, {
-      onSuccess: () => {
-        form.reset();
-        onOpenChange(false);
-      },
-    });
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Record Interest</DialogTitle>
-        </DialogHeader>
-        <div className="bg-muted/30 p-3 rounded-lg mb-4 space-y-1 text-sm">
-          <p><span className="text-muted-foreground">Item:</span> {item.description}</p>
-          <p><span className="text-muted-foreground">Principal:</span> <CurrencyDisplay amount={item.amount_lended} /></p>
-          <p><span className="text-muted-foreground">Current Interest:</span> <CurrencyDisplay amount={item.compound_interest} /></p>
-          <p><span className="text-muted-foreground">Total Due:</span> <CurrencyDisplay amount={item.outstanding_balance} className="font-semibold text-primary" /></p>
-        </div>
-        <div className="mb-4 border-t pt-4">
-          <h4 className="font-semibold text-sm mb-2">Interest History</h4>
-          <ItemInterestHistory itemId={item.id} />
-        </div>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="interest_amount" render={({ field }) => (
-              <FormItem><FormLabel>Interest Amount to Add (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-            )} />
-            <Button type="submit" className="w-full" disabled={recordMutation.isPending}>
-              {recordMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Record Interest
-            </Button>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ItemInterestHistory({ itemId }: { itemId: number }) {
-  const { data: history, isLoading } = useInterestHistory(itemId);
-  
-  if (isLoading) return <div className="p-4 text-center"><Loader2 className="h-5 w-5 animate-spin inline" /></div>;
-  if (!history?.length) return <div className="p-4 text-center text-sm text-muted-foreground">No interest recorded yet.</div>;
-
-  return (
-    <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto">
-      {history.map(record => (
-        <div key={record.id} className="flex justify-between items-center p-2 border-b last:border-0 text-sm">
-          <div>
-            <p className="font-medium"><DateDisplay dateString={record.ledger_date} /></p>
-            <p className="text-xs text-muted-foreground">+ <CurrencyDisplay amount={record.interest_amount} /></p>
-          </div>
-          <div className="text-right">
-            <p className="font-semibold text-primary"><CurrencyDisplay amount={record.cumulative_interest} /></p>
-            <p className="text-xs text-muted-foreground">Bal: <CurrencyDisplay amount={record.outstanding_balance} /></p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+import { RecordInterestDialog } from "@/components/shared/record-interest-dialog";
+import { Package, Search, Calculator, ArrowRight } from "lucide-react";
 
 function ItemsList({ status }: { status: ItemStatus }) {
   const { data: page, isLoading } = useItemsByStatus(status);

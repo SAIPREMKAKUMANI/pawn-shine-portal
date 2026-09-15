@@ -17,9 +17,12 @@ import { PageHeader } from "@/components/shared/page-header";
 import { redeemBillSchema, type RedeemBillFormValues } from "@/validators/redeem-bill.schema";
 import { formatDateForApi } from "@/utils/format-date";
 import { formatCurrency } from "@/utils/format-currency";
-import { Plus, Trash2, Loader2, IndianRupee, CheckCircle2, Wallet, ArrowDownRight, ShieldCheck } from "lucide-react";
+import { Plus, Trash2, Loader2, IndianRupee, CheckCircle2, Wallet, ArrowDownRight, ShieldCheck, Calculator } from "lucide-react";
 import { useCustomerWallet, useWalletTransactions } from "@/hooks/use-wallet.hook";
 import { DateDisplay } from "@/components/shared/date-display";
+import { RecordInterestDialog } from "@/components/shared/record-interest-dialog";
+import { ItemImageGallery } from "@/components/shared/item-image-gallery";
+import type { ItemDto } from "@/types/api.types";
 
 export default function RedeemItemsPage() {
   const navigate = useNavigate();
@@ -28,6 +31,10 @@ export default function RedeemItemsPage() {
   const { data: accounts } = useAccountsList();
   const redeemMutation = useRedeemBill();
 
+  // State for recording interest
+  const [interestDialogOpen, setInterestDialogOpen] = useState(false);
+  const [selectedItemForInterest, setSelectedItemForInterest] = useState<ItemDto | null>(null);
+
   // Read query params for auto-selection
   const preselectedCustomerId = searchParams.get("customerId") ? parseInt(searchParams.get("customerId")!) : null;
   const preselectedItemId = searchParams.get("itemId") ? parseInt(searchParams.get("itemId")!) : null;
@@ -35,7 +42,7 @@ export default function RedeemItemsPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(preselectedCustomerId);
   const [hasAutoSelected, setHasAutoSelected] = useState(false);
   const { data: activeItems, isLoading: isLoadingItems } = useActiveCustomerItems(selectedCustomerId);
-  
+
   const { data: wallet } = useCustomerWallet(selectedCustomerId);
   const { data: walletTx } = useWalletTransactions(selectedCustomerId);
   const depositTransactions = useMemo(() => walletTx?.filter(tx => tx.type === 'DEPOSIT') ?? [], [walletTx]);
@@ -55,7 +62,7 @@ export default function RedeemItemsPage() {
   });
 
   const accountFields = useFieldArray({ control: form.control, name: "accounts" });
-  
+
   const watchItemIds = form.watch("itemIds");
   const watchAccounts = form.watch("accounts");
 
@@ -127,10 +134,10 @@ export default function RedeemItemsPage() {
       form.setError("custId", { message: "Select a customer" });
       return;
     }
-    
+
     // Filter out accounts with 0 amount to avoid backend errors
     const validAccounts = values.accounts.filter(a => a.amount > 0 && a.accountId > 0);
-    
+
     if (!walletCoversAll && validAccounts.some(a => a.accountId === 0)) {
       form.setError("accounts.0.accountId", { message: "Select an account" });
       return;
@@ -207,35 +214,34 @@ export default function RedeemItemsPage() {
                         {activeItems.map(item => {
                           const isSelected = watchItemIds.includes(item.id);
                           const hasPaidAmount = item.paid_amount > 0;
-                          const paidPercentage = item.paid_amount > 0 
-                            ? Math.min(100, (item.paid_amount / (item.amount_lended + item.compound_interest)) * 100) 
+                          const paidPercentage = item.paid_amount > 0
+                            ? Math.min(100, (item.paid_amount / (item.amount_lended + item.compound_interest)) * 100)
                             : 0;
 
                           return (
-                            <div 
-                              key={item.id} 
-                              className={`relative overflow-hidden p-4 border rounded-lg transition-all duration-200 ${
-                                isSelected 
-                                  ? "border-primary bg-primary/5 shadow-sm" 
-                                  : hasPaidAmount 
-                                    ? "border-emerald-300 bg-emerald-50/30 hover:bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-950/20" 
+                            <div
+                              key={item.id}
+                              className={`relative overflow-hidden p-4 border rounded-lg transition-all duration-200 ${isSelected
+                                  ? "border-primary bg-primary/5 shadow-sm"
+                                  : hasPaidAmount
+                                    ? "border-emerald-300 bg-emerald-50/30 hover:bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-950/20"
                                     : "hover:bg-muted/30"
-                              }`}
+                                }`}
                             >
                               {/* Paid progress bar at bottom */}
                               {hasPaidAmount && (
                                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted/30">
-                                  <div 
-                                    className="h-full bg-emerald-500 transition-all duration-500" 
-                                    style={{ width: `${paidPercentage}%` }} 
+                                  <div
+                                    className="h-full bg-emerald-500 transition-all duration-500"
+                                    style={{ width: `${paidPercentage}%` }}
                                   />
                                 </div>
                               )}
 
                               <div className="flex items-center space-x-3">
-                                <Checkbox 
-                                  checked={isSelected} 
-                                  onCheckedChange={(checked) => handleItemToggle(item.id, checked as boolean)} 
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => handleItemToggle(item.id, checked as boolean)}
                                 />
                                 <div className="flex-1 flex justify-between items-center">
                                   <div>
@@ -254,12 +260,26 @@ export default function RedeemItemsPage() {
                                         </span>
                                       </p>
                                     )}
+                                    <ItemImageGallery itemId={item.id} itemDescription={item.description} />
                                   </div>
-                                  <div className="text-right">
+                                  <div className="text-right flex flex-col items-end gap-1">
                                     <p className="text-sm text-muted-foreground">
                                       {hasPaidAmount ? "Remaining Due" : "Total Due"}
                                     </p>
                                     <p className="font-bold text-primary text-lg">{formatCurrency(item.outstanding_balance)}</p>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs text-muted-foreground hover:text-primary gap-1"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedItemForInterest(item);
+                                        setInterestDialogOpen(true);
+                                      }}
+                                    >
+                                      <Calculator className="h-3.5 w-3.5" /> Record Interest
+                                    </Button>
                                   </div>
                                 </div>
                               </div>
@@ -283,14 +303,13 @@ export default function RedeemItemsPage() {
                 <CardTitle>3. Payment Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                
+
                 {/* Wallet Coverage Section */}
                 {walletBalance > 0 && (
-                  <div className={`rounded-lg p-4 space-y-3 border ${
-                    walletCoversAll 
-                      ? "bg-emerald-500/10 border-emerald-500/30" 
+                  <div className={`rounded-lg p-4 space-y-3 border ${walletCoversAll
+                      ? "bg-emerald-500/10 border-emerald-500/30"
                       : "bg-emerald-500/5 border-emerald-500/20"
-                  }`}>
+                    }`}>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400 font-medium">
                         <Wallet className="h-5 w-5" />
@@ -303,7 +322,7 @@ export default function RedeemItemsPage() {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Wallet allocation breakdown */}
                     {totalWalletUsed > 0 && (
                       <div className="bg-white/50 dark:bg-black/20 rounded-md p-3 space-y-2">
@@ -316,12 +335,12 @@ export default function RedeemItemsPage() {
                             </span>
                           </div>
                           <div className="w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                               style={{ width: `${totalPrincipal > 0 ? (walletForPrincipal / totalPrincipal) * 100 : 0}%` }}
                             />
                           </div>
-                          
+
                           {totalInterest > 0 && (
                             <>
                               <div className="flex justify-between items-center text-sm mt-1">
@@ -331,14 +350,14 @@ export default function RedeemItemsPage() {
                                 </span>
                               </div>
                               <div className="w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                   className="h-full bg-blue-500 rounded-full transition-all duration-300"
                                   style={{ width: `${totalInterest > 0 ? (walletForInterest / totalInterest) * 100 : 0}%` }}
                                 />
                               </div>
                             </>
                           )}
-                          
+
                           <div className="flex justify-between items-center text-sm font-semibold pt-2 border-t border-emerald-500/20 mt-2">
                             <span>Total from Wallet</span>
                             <span className="text-emerald-700 dark:text-emerald-300">{formatCurrency(totalWalletUsed)}</span>
@@ -389,32 +408,32 @@ export default function RedeemItemsPage() {
                     </div>
                     {accountFields.fields.map((accField, index) => (
                       <div key={accField.id} className="flex gap-4 items-end">
-                      <FormField control={form.control} name={`accounts.${index}.accountId`} render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Deposit To</FormLabel>
-                          <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value ? field.value.toString() : ""}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              {activeAccounts.map(a => {
-                                const absBalance = formatCurrency(Math.abs(a.balance));
-                                const suffix = a.balance < 0 ? "Lent" : "In Hand";
-                                return (
-                                  <SelectItem key={a.id} value={a.id.toString()}>
-                                    {a.bank_name} (Bal: {absBalance} {suffix})
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name={`accounts.${index}.amount`} render={({ field }) => (
-                        <FormItem className="flex-1"><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                      )} />
-                      {index > 0 && <Button type="button" variant="ghost" size="icon" className="mb-2" onClick={() => accountFields.remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
-                    </div>
-                  ))}
+                        <FormField control={form.control} name={`accounts.${index}.accountId`} render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Deposit To</FormLabel>
+                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value ? field.value.toString() : ""}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger></FormControl>
+                              <SelectContent>
+                                {activeAccounts.map(a => {
+                                  const absBalance = formatCurrency(Math.abs(a.balance));
+                                  const suffix = a.balance < 0 ? "Lent" : "In Hand";
+                                  return (
+                                    <SelectItem key={a.id} value={a.id.toString()}>
+                                      {a.bank_name} (Bal: {absBalance} {suffix})
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name={`accounts.${index}.amount`} render={({ field }) => (
+                          <FormItem className="flex-1"><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        {index > 0 && <Button type="button" variant="ghost" size="icon" className="mb-2" onClick={() => accountFields.remove(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -456,6 +475,14 @@ export default function RedeemItemsPage() {
           </Button>
         </form>
       </Form>
+
+      {selectedItemForInterest && (
+        <RecordInterestDialog
+          open={interestDialogOpen}
+          onOpenChange={setInterestDialogOpen}
+          item={selectedItemForInterest}
+        />
+      )}
     </div>
   );
 }
