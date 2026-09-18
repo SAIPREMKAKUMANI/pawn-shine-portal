@@ -1,14 +1,14 @@
 # ============================================================
-# Pawn Shine — Public Instance (Frontend UI Only)
+# Pawn Shine — Public Instance (Frontend UI Only with SSL/TLS)
 # Run on: Public subnet instance (has public IP)
 #
-# This compose file runs ONLY the Nginx frontend.
+# This compose file runs the Nginx frontend with HTTPS enabled.
 # Nginx reverse-proxies /api/* requests to the private backend
 # instance over the Oracle VCN internal network.
 #
 # Usage:
 #   1. Copy this file to ~/pawn-deploy/docker-compose.yml
-#   2. Set BACKEND_PRIVATE_IP in ~/pawn-deploy/.env
+#   2. Set BACKEND_PRIVATE_IP & DOMAIN_NAME in ~/pawn-deploy/.env
 #   3. docker compose up -d --build
 # ============================================================
 
@@ -20,17 +20,24 @@ services:
     container_name: pawn_frontend
     restart: always
     ports:
-      - "80:8092"
+      - "80:80"
+      - "443:443"
     environment:
-      - BACKEND_PRIVATE_IP=${BACKEND_PRIVATE_IP}
+      - BACKEND_PRIVATE_IP=${BACKEND_PRIVATE_IP:-10.0.1.29}
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - NGINX_ENVSUBST_FILTER=$$BACKEND_PRIVATE_IP $$DOMAIN_NAME
     volumes:
-      - ./pawn-frontend/nginx-ui.conf:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx-ui.conf:/etc/nginx/templates/default.conf.template:ro
+      - ${SSL_CERT_PATH:-/etc/letsencrypt/live/default/fullchain.pem}:/etc/nginx/ssl/fullchain.pem:ro
+      - ${SSL_KEY_PATH:-/etc/letsencrypt/live/default/privkey.pem}:/etc/nginx/ssl/privkey.pem:ro
+      - /var/www/certbot:/var/www/certbot:ro
     deploy:
       resources:
         limits:
           memory: 512M
     healthcheck:
-      test: [ "CMD-SHELL", "wget -qO- http://localhost:8092/ || exit 1" ]
+      test: [ "CMD-SHELL", "wget --no-check-certificate -qO- https://localhost/ || wget -qO- http://localhost/ || exit 1" ]
       interval: 30s
       timeout: 5s
       retries: 3
+

@@ -31,7 +31,8 @@ cd ..
 # 2. Update docker-compose from frontend repo
 # -----------------------------------------------------------
 echo "[2/3] Updating docker-compose.yml..."
-cp pawn-frontend/docker-compose.public.yml docker-compose.yml
+cp pawn-frontend/docker-compose.yml docker-compose.yml
+
 
 # -----------------------------------------------------------
 # 3. Rebuild and restart the frontend container
