@@ -26,8 +26,9 @@ COPY nginx-ui.conf /etc/nginx/conf.d/default.conf
 # Copy the built assets from the builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose port 80
-EXPOSE 8092
+# Expose ports 80 (HTTP) and 443 (HTTPS)
+EXPOSE 80 443
+
 
 # Run nginx
 CMD ["nginx", "-g", "daemon off;"]
